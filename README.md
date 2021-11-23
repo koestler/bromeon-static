@@ -1,2 +1,2 @@
 # bromeon-static
-Soruce code of https://bromeon.ch
+Source code of https://bromeon.ch
