@@ -1,0 +1,91 @@
+@charset "utf-8";
+/* CSS Document */
+
+
+.sidebar
+{
+	font-family: "Trebuchet MS", "Tahoma", "Lucida Sans Unicode", serif;
+	font-size: 22px;
+	margin-top: 30px;
+	width: 180px;
+	float: left;
+	
+	background-image: url(dark-gradient.png);
+	background-repeat: repeat-x;
+	background-color: #111111;
+	padding-left: 10px;
+	
+	border-radius: 7px;
+	border: 1px solid #333;
+	background-clip: padding-box;
+}
+
+#content
+{
+	background-image: url(dark-gradient.png);
+	background-repeat: repeat-x;
+	background-color: #111111;
+	padding-left: 15px;
+	padding-right: 15px;
+	margin-top: 30px;
+	margin-left: 195px;
+	
+	border-radius: 7px;
+	border: 1px solid #333;
+	background-clip: padding-box;
+}
+
+.sidebar a
+{	
+	font-weight: bold;
+	color: #6B7A8C;
+}
+
+.sb-cur a
+{
+	//color: #50878A;
+	color: #257364;
+}
+
+/*.sidebar p
+{
+	border-color: gray;
+	border-width: thin;
+	border-style: ridge;
+}*/
+
+.sb-sub
+{
+	font-size: 18px;
+	padding-left: 15px;
+	line-height: 15px;
+}
+
+.sb-sub2
+{
+	font-size: 15px;
+	padding-left: 20px;
+	line-height: 6px;
+}
+
+a:hover
+{
+	color: #35AAE8;
+}
+
+#header
+{
+	margin-left: 0px;
+	margin-top: 0px;
+	margin-bottom: -30px;
+}
+
+#footer
+{
+	font-family: Verdana, Geneva, sans-serif;
+    font-size: 10px;
+    color: #606060;
+	padding-top: 5px;
+	margin-left: 195px;
+    text-align: left;
+}

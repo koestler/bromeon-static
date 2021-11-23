@@ -1,0 +1,124 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Resources Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Resources Tutorial  </h1>
+  <p>Welcome to  the tutorial about the Resources module of the Thor Library. Resources are  heavyweight objects that can be loaded from the application, such as images,  fonts, sound files, etc. In SFML, there exist six classes with resource semantics:</p>
+  <ul>
+    <li><code>sf::Image</code></li>
+    <li><code>sf::Texture</code></li>
+    <li><code>sf::Font</code></li>
+    <li><code>sf::Shader</code></li>
+    <li><code>sf::SoundBuffer</code></li>
+    <li><code>sf::Music</code></li>
+  </ul>
+  <p>Note that <code>sf::Music</code> is a special case; it behaves quite distinctly from the rest. Music is streamed and thus not completely loaded into memory. It has no real data, so shared access makes not much sense.</p>
+  <p>The Thor Resources module provides an interface that simplifies loading and access to these resources. Basically, the module consists of three widely independent parts:</p>
+<img src="resources.png" />
+<h2>Resource keys</h2>
+<p>Keys are  IDs to access the resources. They contain loading information for the  corresponding resource. A resource key for an <code>sf::Image</code> which should be loaded  from a file &ldquo;image.jpg&rdquo; is declared like this (given we write <code>using thor::Resources::ImageKey;</code> for simplicity):</p>
+<pre>ImageKey key = ImageKey::FromFile(<span class="code-string">"image.jpg"</span>);</pre>
+
+<p>These  static factory methods indirect to the loading functions in <code>sf::Image</code>, namely <code>Create()</code>, <code>LoadFromFile()</code> and <code>LoadFromMemory()</code>, and they have the same  signature. This relation applies for the other resource classes in SFML, too.</p>
+<p> As mentioned,  resource keys represent identifiers for resource access. Keys that are  initialized identically refer to the same resource. Analogously, keys being  initialized with different parameters (or even different factory functions) are  always distinct, which means they refer to different resources. Note that  resource keys do neither store  nor reference the resource. The only thing  they have is the abstract knowledge about how to load resources and how to  differ between them.</p>
+<h2>Resource managers</h2>
+<p>The class  template <code>thor::ResourceManager</code> is the core of the resource management system.  It maps keys to resources and returns pointers to access them. But before, it  has to load the resources into memory, what can be done using the resource keys:</p>
+<pre>ImageKey key = ImageKey::FromFile(<span class="code-string">"image.jpg"</span>);
+thor::ResourceManager&lt;sf::Image&gt; mgr;
+mgr.Acquire(key);</pre>
+<p>The  <code>Acquire()</code> function loads the resource according to the way in which the  resource key was initialized. In the upper example, the image is loaded from a  file called &ldquo;image.jpg&rdquo;. The next time we acquire the image using the same key,  the <code>ResourceManager</code> recognizes that the corresponding resource has already been  allocated and does not load it again. But when we use a different key  (initialized with other parameters or another factory function), we address  another resource, therefore it is not cached. To make it clear:</p>
+<pre>thor::ResourceManager&lt;sf::Image&gt; mgr;
+mgr.Acquire(key);   <span class="code-comment">// Loads a new resource
+</span>mgr.Acquire(key2); <span class="code-comment"> // Loads a new resource
+</span>mgr.Acquire(key);   <span class="code-comment">// No loading (resource already stored)</span></pre>
+
+<p>In  case a resource cannot be loaded (e.g. wrong filename), the method <code>Acquire()</code> throws an exception of type <code>thor::ResourceLoadingException</code>. </p>
+<p>Note that <code>thor::ResourceManager</code> does actually not own the resources. It rather acts as a cache with the knowledge about the resources it has already loaded (and how they have been loaded). The resource manager does automatically free resources in its destructor, but only those which aren't referenced from the outside anymore.</p>
+<h2>Resource pointers</h2>
+<p>We have now  seen how to load resources, but how can we actually use them? Here comes the  third component of the Resources module into play: The class template  <code>ResourcePtr</code>. This smart-pointer offers a safe and elegant way to access the  resources as soon as they are loaded. It is returned by the <code>Acquire()</code> function.</p>
+<pre>thor::Resources::ImageKey key = …;
+thor::ResourceManager&lt;sf::Image&gt; mgr;
+thor::ResourcePtr&lt;sf::Image&gt; image = mgr.Acquire(key);
+</pre>
+
+<p>The smart  pointer <code>ResourcePtr</code> has the following properties:</p>
+<ul>
+  <li>Pointer-like  behavior through overloaded dereferencing operators <code>*</code> and <code>-&gt;</code> to access the  resource class.</li>
+  <li>Shared-ownership  semantics. If you copy <code>ResourcePtr</code> instances, you get multiple smart pointers  that point to the same resource. The instances are lightweight objects, they  can be passed around or stored in STL containers without the high cost of  copying the resource itself.</li>
+  <li>Strong  reference semantics. As long as a <code>ResourcePtr</code> refers to a resource, the latter  cannot be released. This prevents accidental destruction of resources that are  in use. Even when the <code>ResourceManager</code> that loaded the  resource is destroyed, remaining <code>ResourcePtr</code> instances are not affected.</li>
+</ul>
+<p>When you want to access loaded resources  without possibly allocating new ones, <code>Search()</code> is the function of your choice.  It never loads resources. In case nothing is found, a null pointer is returned.</p>
+<h2>Resource release</h2>
+<p>When you  allocate resources, you also have to deallocate them. Or maybe not you alone,  the <code>ResourceManager</code> helps you doing this task. To allow reasonable  deallocation, the resource class must support RAII, hence its destructor must  take care of cleaning its own resources up. But this is normally no problem  when you program in C++. Every SFML resource class does this automatically.</p>
+<p> Resources stored in a resource manager are released in the destructor <code>~ResourceManager()</code> – unless you release them before, or unless you still need them. Without further  configurations, resources are kept in memory until you explicitly release them. This behavior is quite meaningful, as it  saves time to reallocate resources that are temporarily unused. On the other hand,  there are situations which require a preferably low resource allocation. Here,  resources are released as soon as they become unused. The Thor library supports  both release strategies; they reside as <code>ExplicitRelease</code> and <code>AutoRelease</code> in  namespace <code>thor::Resources</code>.</p>
+<p> Now you  still don’t know how to release resources! Well, that’s simple, just call the <code>Release()</code> function:</p>
+<pre>… <span class="code-comment">// as always
+</span>mgr.Release(key);
+</pre>
+
+<p> If the  corresponding resource is not used at the moment of the call, it is immediately  released. Otherwise, things get more complex. As mentioned above, <code>ResourcePtr</code> instances keep their resources alive, so the resource is not released. However,  the <code>ResourceManager</code> will take care of releasing it ASAP – this happens the  moment that the last <code>ResourcePtr</code> loses ownership of the resource.</p>
+<h2>Const correctness  [advanced]</h2>
+<p>It is often  desirable that resources are not altered after they have been initialized.  <code>ResourcePtr</code> is powerful enough to imitate the const-correct behavior of raw  pointers. That is to say, you can add const qualifiers, but not remove them.</p>
+<pre>thor::ResourcePtr&lt;sf::Image&gt; ptr;
+thor::ResourcePtr&lt;<span class="code-keyword">const</span> sf::Image&gt; cptr;
+ ptr =  ptr; <span class="code-comment">// ok
+</span>cptr = cptr; <span class="code-comment">// ok
+</span>cptr =  ptr; <span class="code-comment">// ok, adding const-qualifier
+</span> ptr = cptr; <span class="code-comment">// not okay, removing const-qualifier</span></pre>
+
+<p>So when you  use pointers to constant resources, you prevent accidental modification through  <code>ResourcePtr</code>. If you are very radical, you can even declare the template  argument of <code>ResourceManager</code> const! Like this, you have no possibility to change  resources once they have been loaded.</p>
+<pre>thor::ResourceManager&lt;<span class="code-keyword">const</span> sf::Image&gt; mgr;
+thor::ResourcePtr&lt;<span class="code-keyword">const</span> sf::Image&gt; cptr = mgr.Acquire(key); <span class="code-comment">// ok
+</span>thor::ResourcePtr&lt;sf::Image&gt; ptr = mgr.Acquire(key); <span class="code-comment">       // not ok</span></pre>
+
+<h2>Different management  strategies [advanced]</h2>
+<p>The  resource manager allows tweaking some behavior. This concerns the following  actions, which concern <code>Acquire()</code> calls in the future:</p>
+<ul>
+  <li>When  a resource cannot be acquired, throw exception or return null pointer? This can  be configured via <code>SetLoadingFailureStrategy()</code>.</li>
+  <li>When  the last resource pointer loses ownership of a resource, automatically release it or  only release on explicit request? Use <code>SetReleaseStrategy()</code> to choose the  reaction.</li>
+</ul>
+<h2>Custom resources  [advanced]</h2>
+<p>Having your  own resource class, the following steps are required to make it compatible with  <code>thor::ResourceManager</code>:</p>
+<ul>
+  <li>Your resource class shall support  RAII, but neither copyability nor default-constructibility is required.</li>
+  <li>You need to define a key class that  conforms the requirements in the documentation (second template parameter of  <code>thor::ResourceManager</code>).</li>
+</ul>
+<p>That’s it.</p>
+<p>&nbsp;</p>
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

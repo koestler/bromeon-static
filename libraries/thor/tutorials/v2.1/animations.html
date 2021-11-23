@@ -1,0 +1,104 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Animations Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Animations Tutorial</h1>
+  <p><a href="../../documentation/v2.1/group___animations.html">[Link to documentation]</a></p>
+  <p>In this tutorial, I will show you how to use animations with the Thor library.
+The Thor.Animations module provides flexible and generic classes that help you animate sprites, texts, shapes or user-defined objects.</p>
+  <h2>Animations</h2>
+  <p>In Thor, &quot;animation&quot; is a very wide term. It includes any function that modifies an object depending on a progress value in [0, 1]. Here, 0 denotes the start and 1 the end of the animation. In other words, any functions conforming to the following signature can be considered animations, where <code>Animated</code> is the type of object being animated:</p>
+  <pre><span class="code-keyword">void</span> (Animated&amp; object, <span class="code-keyword">float</span> progress);</pre>
+  <p> Typically, animations modify the color, texture rect, scale, or other graphical properties over time, but there is no restriction. This  somehow vague approach allows you to handle not only specific classes such as <code>sf::Sprite</code>, but any types with the correct requirements. It would even be possible to use Thor.Animations for classes that are not related to rendering at all.</p>
+  <p>To get more concrete, let's look at a specific animation type. <code>thor::FrameAnimation</code> changes the texture rectangle over time. This class is a functor, that is, it overloads <code>operator()</code> in order to be called like a function. It is possible to define different texture rects, which are applied one after another, by using the <code>addFrame()</code> method. </p>
+  <pre>
+sf::IntRect rect1(...);  
+sf::IntRect rect2(...);
+
+thor::FrameAnimation animation;
+animation.addFrame(1.f, rect1);
+animation.addFrame(3.f, rect2);</pre>
+  <p>Apart from the texture rect,  a relative duration is passed that specifies how long (in relation to others) a specific frame is displayed. The above code shows <code>rect1</code> for the 1st quarter and <code>rect2</code> for the 2nd, 3rd and 4th quarter of the whole animation. Note that <code>1.f</code> and <code>3.f</code> are <strong>not</strong> absolute durations like seconds; absolute durations are always expressed in terms of <code>sf::Time</code>.</p>
+  <p>Now we already have an animation that can be applied to drawable objects, for example <code>sf::Sprite</code>. The <code>thor::FrameAnimation</code> in particular requires the existence of a <code>setTextureRect()</code> member function. Since the provided <code>operator()</code> is a function template, any class meeting these requirements can be animated. The following code shows how to apply the animation to a sprite for a given progress in [0,1]. The progress can be updated continuously, e.g. once in your game loop.</p>
+  <pre>sf::Sprite sprite;
+<span class="code-keyword">float</span> progress = 0.f;
+animation(sprite, progress);</pre>
+  <h2>Animators</h2>
+  <p>Recomputing the progress from a frame time is tedious and  doesn't offer a lot of flexibility. What if you have a soldier sprite with several animations such as stand, walk and attack? It would be nice to switch between them at any time and to simply play an animation for a given time, without taking care of  the progress.</p>
+  <p>This is where <code>thor::Animator</code> comes into play. This class template provides an interface to register multiple animations and to associate them with identifiers such as strings or enums. Assume we have the animations<code>stand</code>, <code>walk</code> and <code>attack</code> which are correctly initialized; we can then create an animator for <code>sf::Sprite</code> with <code>std::string</code> identifiers (these are the two template arguments, respectively). The <code>addAnimation()</code>method registers an animation for a given identifier and duration. This time, the duration is absolute. In our example, all animations shall last for one second.</p>
+  <pre>thor::FrameAnimation stand, attack, walk;
+
+thor::Animator&lt;sf::Sprite, std::string&gt; animator;
+animator.addAnimation(<span class="code-string">"walk"</span>, walk, sf::seconds(1.f));
+animator.addAnimation(<span class="code-string">"stand"</span>, stand, sf::seconds(1.f));
+animator.addAnimation(<span class="code-string">"attack"</span>, attack, sf::seconds(1.f));</pre>
+  <p>Now the register step is complete. The <code>thor::Animator</code> class template can store multiple animations and play one of them.  
+  
+The <code>playAnimation()</code> function starts playing an animation, the animator will take care of it for the duration specified in <code>addAnimation()</code>, which is one second in this case.<pre>animator.playAnimation(<span class="code-string">&quot;walk&quot;</span>);</pre>
+<p>It is also possible to stop a playing animation immediately. When an animation is stopped or has finished, the object remains in the last animated state.
+<pre>animator.stopAnimation(<span class="code-string"></span>);
+</pre>
+<p>In the game loop, we continuously call the <code>update()</code> method with the elapsed frame time. Internally, the animator takes care of computing the   progress for the current animation. The <code>animate()</code> method then applies the animation to one or more objects, in this example a sprite.
+<pre>
+sf::Clock clock;
+sf::Sprite sprite;
+
+<span class="code-keyword">for</span> (;;)
+{
+    ...
+    animator.update(clock.restart());
+    animator.animate(sprite);
+}</pre>
+<p>To check whether an animation is playing, you can use the method <code>isPlayingAnimation()</code>. If an animation is playing   — and only in this case — you can get its ID using <code>getPlayingAnimation()</code>. Be careful, calling this function without a playing animation yields undefined behavior.</p>
+<pre><span class="code-keyword">if</span> (animator.isPlayingAnimation())
+    std::cout &lt;&lt; &quot;Currently playing: &quot; &lt;&lt; animator.getPlayingAnimation() &lt;&lt; &quot;.\n&quot;;
+<span class="code-keyword">else</span>
+    std::cout &lt;&lt; &quot;Currently stopped.\n&quot;;</pre>
+<h2>Customization [advanced]
+</h2>
+<p>Thor ships a few common animations, but it is also possible to create your own one. Your animation function simply has to be convertible to <code>std::function&lt;void (Animated&amp;, float)&gt;</code>, where <code>Animated</code> is the type of object to animate and the <code>float</code> denotes a [0,1] progress.
+<p>As an example, let's define an animation that rotates a sprite by 360°.<pre>
+<span class="code-keyword">void</span> rotate(sf::Transformable&amp; animated, <span class="code-keyword">float</span> progress)
+{<br />    animated.setRotation(360.f * progress);<br />}
+
+thor::Animator&lt;sf::Sprite, std::string&gt; animator;
+animator.addAnimation(<span class="code-string">&quot;rotate&quot;</span>, &amp;rotate, sf::seconds(1.f));
+</pre>
+<p> By using a function template  <code>rotate&lt;Animated&gt;()</code>, it is possible to generalize the animation even further and support any type that provides a <code>setRotation()</code> method.
+<p>That's  it! You can of course build arbitrarily complex animations. Where appropriate, you may want to use functors and lambda expressions.</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

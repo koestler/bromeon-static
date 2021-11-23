@@ -1,0 +1,174 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Resources Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Resource Cache Tutorial  </h1>
+  <div class="warning-box">
+  This tutorial is outdated and will be removed shortly. <code>thor::ResourceCache</code> has been replaced by the superior <code>thor::ResourceHolder</code>. Consider reading the <a href="resources.html">Resources Tutorial</a> instead.
+  </div>
+  <p>Welcome to  the tutorial about the Resources module of the Thor Library. Resources are  heavyweight objects that can be loaded from the application, such as images,  fonts, sound files, etc. In SFML, there exist the following classes with typical resource semantics:</p>
+  <ul>
+    <li><code>sf::Image</code></li>
+    <li><code>sf::Texture</code></li>
+    <li><code>sf::Font</code></li>
+    <li><code>sf::Shader</code></li>
+    <li><code>sf::SoundBuffer</code></li>
+  </ul>
+  <p>Note that <code>sf::Music</code> is a special case; it behaves quite distinctly from the rest. Music is streamed and thus not completely loaded into memory. It has no real data, so shared access makes not much sense.</p>
+  <p>The Thor Resources module provides an interface that simplifies loading and access to  resources. These can be the ones of SFML, Thor also allows you to integrate your own resource types. Basically, the module consists of three widely independent parts:</p>
+<img src="resources.png" />
+<h2>Resource keys</h2>
+<p>Keys are  IDs to access the resources. They contain loading information for the  corresponding resource. A resource key for an <code>sf::Texture</code> which should be loaded  from a file &ldquo;image.jpg&rdquo; is declared like this:</p>
+<pre>thor::ResourceKey&lt;sf::Texture&gt; key = thor::Resources::fromFile&lt;sf::Texture&gt;(<span class="code-string">"image.jpg"</span>);</pre>
+
+<p>The  function<code>fromFile()</code>indirects to the loading function  <code>sf::Texture::loadFromFile()</code> and has the same  signature. </p>
+<p> As mentioned,  resource keys represent identifiers for resource access. Keys that are  initialized identically refer to the same resource. Analogously, keys being  initialized with different parameters (or even different  functions) are  always distinct, which means they refer to different resources. Note that  resource keys do not store the resource itself. The only thing  they have is the abstract knowledge about how to load resources and how to  differ between them.</p>
+<h2>Resource caches</h2>
+<p>The class  template <code>thor::ResourceCache</code> is the core of the resource management system.  It maps keys to resources and returns pointers to access them. But before, it  has to load the resources into memory, what can be done using the resource keys:</p>
+<pre>
+thor::ResourceCache&lt;sf::Texture&gt; cache;
+cache.acquire(thor::Resources::fromFile&lt;sf::Texture&gt;(<span class="code-string">&quot;image.jpg&quot;</span>));</pre>
+<p>The  <code>acquire()</code> function loads the resource according to the way in which the  resource key was initialized. In the upper example, the texture is loaded from a  file called &ldquo;image.jpg&rdquo;. The next time we acquire the texture using the same key,  the <code>ResourceCache</code> recognizes that the corresponding resource has already been  allocated and does not load it again. But when we use a different key  (initialized with other parameters or another factory function), we address  another resource, therefore it is not cached. To make it clear:</p>
+<pre>thor::ResourceKey&lt;sf::Texture&gt; key = …, key2 = …; 
+thor::ResourceCache&lt;sf::Texture&gt; cache;
+cache.acquire(key);   <span class="code-comment">// Loads a new resource
+</span>cache.acquire(key2); <span class="code-comment"> // Loads a new resource
+</span>cache.acquire(key);   <span class="code-comment">// No loading (resource already stored)</span></pre>
+
+<p>In  case a resource cannot be loaded (e.g. wrong filename), the method <code>acquire()</code> throws an exception of type <code>thor::ResourceLoadingException</code>. </p>
+<p>Note that <code>thor::ResourceCache</code> does actually not own the resources. It rather acts as a cache with the knowledge about the resources it has already loaded (and how they have been loaded). The resource cache does automatically deallocate resources in its destructor, but only those which aren't referenced from the outside anymore.</p>
+<p>If you want a single cache to store resources of different types, the class <code>thor::MultiResourceCache</code> is your friend:</p>
+<pre>thor::MultiResourceCache mcache;
+mcache.acquire(thor::Resources::fromFile&lt;sf::Texture&gt;(<span class="code-string">"image.jpg"</span>));
+mcache.acquire(thor::Resources::fromFile&lt;sf::SoundBuffer&gt;(<span class="code-string">"sound.wav"</span>));</pre>
+
+<h2>Resource pointers</h2>
+<p>We have now  seen how to load resources, but how can we actually use them? Here comes the  third component of the Resources module into play: The <code>std::shared_ptr</code> class template. This smart-pointer offers a safe and elegant way to access the  resources as soon as they are loaded. It is returned by the <code>acquire()</code> function.</p>
+<pre>thor::ResourceKey&lt;sf::Texture&gt; key = …;
+thor::ResourceCache&lt;sf::Texture&gt; cache;
+std::shared_ptr&lt;sf::Texture&gt; texture = cache.acquire(key);
+</pre>
+
+<p>In case you are not very familiar with  <code>shared_ptr</code>, here is a list of its most important properties:</p>
+<ul>
+  <li>Pointer-like  behavior through overloaded dereferencing operators <code>*</code> and <code>-&gt;</code>. Dereference the smart pointer to access the  resource class.</li>
+  <li>Shared-ownership  semantics. If you copy <code>shared_ptr</code> instances, you get multiple smart pointers  that point to the same resource. The smart pointers can be passed around or stored in STL containers without the high cost of  copying the resource itself.</li>
+  <li>Strong  reference semantics. As long as a <code>shared_ptr</code> refers to a resource, the latter  cannot be released. This prevents accidental destruction of resources that are  in use.</li>
+</ul>
+<p>When you want to access already loaded resources  without possibly allocating new ones, <code>search()</code> is the function of your choice.  It never loads resources. In case nothing is found, a null pointer is returned.</p>
+<h2>Releasing resources</h2>
+<p>When you  allocate resources, you also have to deallocate them. Fortunately,  the smart pointers take over most of the work. To allow reasonable  deallocation, the resource class must support RAII, hence its destructor must  take care of cleaning its own resources up. But this should be the default in modern C++ anyway. Every SFML resource class does this automatically.</p>
+<p> Resources stored in a resource cache are released in the destructor <code>~ResourceCache()</code> – unless you release them before, or unless you still need them. Without further  configurations, resources are kept in memory until you explicitly release them. This behavior is quite meaningful, as it  saves time to reallocate resources that are temporarily unused. On the other hand,  there are situations which require a preferably low resource allocation. Here,  resources are released as soon as they become unused. The Thor library supports  both release strategies; they reside as <code>ExplicitRelease</code> and <code>AutoRelease</code> in  namespace <code>thor::Resources</code>.</p>
+<p> Now you  still don’t know how to release resources! Well, that’s simple, just call the <code>release()</code> function:</p>
+<pre>… <span class="code-comment">// as always
+</span>cache.release(key);
+</pre>
+
+<p> If the  corresponding resource is not used at the moment of the call, it is immediately  released. Otherwise,  the <code>ResourceCache</code> will take care of releasing it ASAP – this happens the  moment when the last <code>shared_ptr</code> loses ownership of the resource.</p>
+<h2>Const correctness  [advanced]</h2>
+<p>It is often  desirable that resources are not altered after they have been initialized.  <code>shared_ptr</code> imitates the const-correct behavior of raw  pointers. That is to say, you can add const qualifiers, but not remove them.</p>
+<pre>std::shared_ptr&lt;sf::Image&gt; ptr;
+std::shared_ptr&lt;<span class="code-keyword">const</span> sf::Image&gt; cptr;
+ ptr =  ptr; <span class="code-comment">// ok, same type
+</span>cptr = cptr; <span class="code-comment">// ok, same type
+</span>cptr =  ptr; <span class="code-comment">// ok, adding const-qualifier
+</span> ptr = cptr; <span class="code-comment">// error, removing const-qualifier</span></pre>
+
+<p>So when you  use pointers to constant resources, you prevent accidental modification through  <code>shared_ptr</code>. If you are very radical, you can even declare the template  argument of <code>ResourceCache</code> const. Like this, you have no possibility to change  resources once they have been loaded.</p>
+<pre>thor::ResourceCache&lt;<span class="code-keyword"></span><span class="code-keyword">const</span> sf::Image&gt; cache;
+std::shared_ptr&lt;<span class="code-keyword">const</span> sf::Image&gt; cptr = cache.acquire(key); <span class="code-comment">// ok
+</span>std::shared_ptr&lt;sf::Image&gt; ptr = cache.acquire(key); <span class="code-comment">       // error</span></pre>
+
+<h2>Different management  strategies [advanced]</h2>
+<p>The  resource cache allows to tweak some behavior. This affects the following  actions, which concern <code>acquire()</code> calls in the future:</p>
+<ul>
+  <li>When  a resource cannot be acquired, throw exception or return null pointer? This can  be configured via <code>setLoadingFailureStrategy()</code>.</li>
+  <li>When  the last resource pointer loses ownership of a resource, automatically release it or  only release on explicit request? Use <code>setReleaseStrategy()</code> to choose the  reaction.</li>
+</ul>
+<h2>Custom resources  [advanced]</h2>
+<p>Having your  own resource class, the following steps are required to make it compatible with Thor:</p>
+<ul>
+  <li>Your resource class shall support  RAII, but neither copyability nor default-constructibility is required.</li>
+  <li>You need to provide resource keys that are able to load the resource.</li>
+</ul>
+<p>A short example shows how to integrate an existing class called <code>Mesh</code> to Thor. First, let's see what's given by the external mesh API:</p>
+<pre><span class="code-comment">// Custom resource class
+</span><span class="code-keyword">class</span> Mesh {};
+
+<span class="code-comment">// Factory function returning a pointer to the resource
+</span>Mesh* createMesh(<span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename);</pre>
+
+<p>On user side, we now implement a functor that is able to load such a mesh. Thor requires this functor to return a <code>std::unique_ptr</code> to the resource, which shall be <code>nullptr</code> in case of loading failure.</p>
+<pre><span class="code-comment">// Functor to load mesh
+</span><span class="code-keyword">struct</span> MeshLoader
+{
+&nbsp;&nbsp;&nbsp;&nbsp; MeshLoader(<span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename)
+&nbsp;&nbsp;&nbsp;&nbsp; : filename(filename)
+&nbsp;&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp;&nbsp; }
+
+&nbsp;&nbsp;&nbsp;&nbsp; std::unique_ptr&lt;Mesh&gt; <span class="code-keyword">operator</span>() () <span class="code-keyword">const</span>
+&nbsp;&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">return</span> std::unique_ptr&lt;Mesh&gt;(createMesh(filename));
+&nbsp;&nbsp;&nbsp;&nbsp; }
+
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename;
+};</pre> 
+<p>Now we are able to create a Thor resource key from the loading functor and a string ID which is unique for the same resource (here the filename): </p>
+<pre>thor::ResourceKey&lt;Mesh&gt; meshKey(<span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename)
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">return</span> thor::ResourceKey&lt;Mesh&gt;(MeshLoader(filename), filename);
+}</pre>
+<p>Afterwards, we can directly use <code>Mesh</code> with Thor:</p>
+<pre><span class="code-keyword"></span>
+<span class="code-keyword">int</span> main()
+{
+&nbsp;&nbsp;&nbsp;&nbsp; thor::ResourceCache&lt;Mesh&gt; cache;
+&nbsp;&nbsp;&nbsp;&nbsp; std::shared_ptr&lt;Mesh&gt; mesh = cache.acquire(meshKey(<span class="code-string">"mesh.obj"</span>));
+}</pre>
+
+<p>Note that if we use lambda expressions, we don't need the functor, so the code to integrate the <code>Mesh</code> class is very short:</p>
+<pre>thor::ResourceKey&lt;Mesh&gt; meshKey(<span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename)
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">return</span> thor::ResourceKey&lt;Mesh&gt;(
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; [=] () { <span class="code-keyword">return</span> std::unique_ptr&lt;Mesh&gt;(createMesh(filename)); },
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; filename);
+}</pre>
+
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

@@ -1,0 +1,190 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Articles :: Why RAII rocks</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../index.html">Home</a></p>
+  <p><a href="../libraries/index.html">C++ Libraries</a></p>
+  <p><a href="../games/index.html">Games</a></p>
+  <p><a href="../articles/index.html">Articles</a></p>
+  <div class="sb-sub">
+    <div class="sb-cur">
+          </div>
+  </div>
+  <p><a href="../book/index.html">Book</a></p>
+  <p><a href="../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+<h1>Why RAII rocks</h1>
+  <em>January 2014</em>
+  <p>Memory management is the process of managing dynamic memory, mainly by allocating and deallocating it. Memory management is tightly coupled to object ownership:  pointers or instances are responsible of deallocating memory areas assigned to them. Pointers that do not own their memory, but rather act as passive indirections to other objects (like references), do not fall under this category and are thus not concerned by this article.</p>
+  <p>In C, memory  is managed mainly using <code>malloc()</code> and <code>free()</code>. It's a well-known fact that these two functions do not interact nicely with C++, because they only operate on raw memory, ignoring constructors and destructors. C++ in turn offers the operators <code>new</code> and <code>delete</code> for the allocation and deallocation of single objects, as well as <code>new[]</code> and <code>delete[]</code> for dynamic arrays. In this article, I will refer to the four memory-related C++ operators using the term <em>manual memory management</em>. What a lot of C++ developers are not aware of: manual memory management is complex, error-prone and verbose. And  worse, it is employed very widely even though it can easily be avoided. Interestingly, to this day, there are still many developers thinking that all the tasks performed by garbage collectors in other languages have to be hand-crafted by C++ programmers. This is untrue; C++ is not C.</p>
+<h2>The problems of manual memory management</h2>
+  <p>As the name already implies, the main disadvantage of manual memory management results from manual  interaction: the user explicitly has to allocate and deallocate memory for the objects. What may sound like a simple task, can be surprisingly difficult as soon as we move away from the most trivial code. Even advanced C++ developers make often mistakes related to memory management -- not because they are bad programmers, but because they  use inherently error-prone techniques. So, why concretely is manual memory management considered bad practice?</p>
+  <ul>
+    <li>The developer has to spend  time about thinking how to allocate and deallocate objects correctly. This time is wasted, as it doesn't add functionality to the application; the time could be used to implement logic instead.</li>
+    <li>The code becomes less readable. <code>new</code> and <code>delete</code> statements do not contribute to the understanding of what a code functionally does -- they just express technical details of the programming language.</li>
+    <li>The code becomes more error-prone and less maintainable. As a result of higher complexity and worse readability, more time is required to modify and extend existing code, and bugs tend to be introduced more quickly. There are a lot of situations where manual deallocation seems to do the right thing, but in fact it does not. Using it correctly can be extremly tricky, more than one might think at first.</li>
+  </ul>
+  <h2>A simple example</h2>
+  <p>Manual memory management is especially difficult to handle when a function contains multiple return paths or when it may throw exceptions. Keep in mind that every possible control path of a function must be protected by one or multiple <code>delete</code> statements, if local variables are allocated using <code>new</code>.  Let's look at a simple example code that contains memory leaks:</p>
+  <pre><span class="code-keyword"><span class="code-keyword">int</span></span> unsafe()
+{
+    A* a = <span class="code-keyword">new</span> A;
+
+    <span class="code-keyword">if</span> (a->f())
+    {
+        B* b = <span class="code-keyword">new</span> B;
+        <span class="code-keyword">if</span> (b->f())
+            <span class="code-keyword">return</span> b->g();
+        <span class="code-keyword">else</span>
+            <span class="code-keyword">return</span> a->g();
+    }
+    
+    <span class="code-keyword">return</span> 0;
+}</pre>
+
+Our task is to fix it. Simple, isn't it? First, assume there are no exceptions. Let's write the corresponding deallocation code:
+<pre><span class="code-keyword">int</span> unsafe2()
+{
+    A* a = <span class="code-keyword">new</span> A;
+
+    <span class="code-keyword">if</span> (a->f())
+    {
+        B* b = <span class="code-keyword">new</span> B;
+
+        <span class="code-keyword">if</span> (b->f())
+        {
+            <span class="code-keyword">int</span> r = b->g();
+            <span class="code-keyword">delete</span> b;
+            <span class="code-keyword">delete</span> a;
+            <span class="code-keyword">return</span> r;
+        }
+        <span class="code-keyword">else</span>
+        {
+            <span class="code-keyword">int</span> r = a->g();
+            <span class="code-keyword">delete</span> b;
+            <span class="code-keyword">delete</span> a;
+            <span class="code-keyword">return</span> r;
+        }
+    }
+
+    <span class="code-keyword">delete</span> a;
+    <span class="code-keyword">return</span> 0;
+}</pre>
+
+<p>Not only do we need to insert <code>delete</code> statements, the manual deallocation forces us to break the code flow and store return values in variables instead of returning them directly.
+  The code looks already quite beautiful, yet we're far from safety.</p>
+<p>Next, we assume that constructors may fail, and attempt to make the code exception-safe (there are no memory leaks in the presence of exceptions) and exception-neutral (thrown exceptions leave the function unchanged): </p>
+<pre><span class="code-keyword">int</span> unsafe3()
+{
+    A* a = <span class="code-keyword">new</span> A;
+
+    <span class="code-keyword">if</span> (a->f())
+    {
+        B* b;
+        <span class="code-keyword">try</span>
+        {
+            b = <span class="code-keyword">new</span> B;
+        }
+        <span class="code-keyword">catch</span> (...)
+        {
+            <span class="code-keyword">delete</span> a;
+            <span class="code-keyword">throw</span>;
+        }
+
+        <span class="code-keyword">if</span> (b->f())
+        {
+            <span class="code-keyword">int</span> r = b->g();
+            <span class="code-keyword">delete</span> b;
+            <span class="code-keyword">delete</span> a;
+            <span class="code-keyword">return</span> r;
+        }
+        <span class="code-keyword">else</span>
+        {
+            <span class="code-keyword">int</span> r = a->g();
+            <span class="code-keyword">delete</span> b;
+            <span class="code-keyword">delete</span> a;
+            <span class="code-keyword">return</span> r;
+        }
+    }
+
+    <span class="code-keyword">delete</span> a;
+    <span class="code-keyword">return</span> 0;
+}</pre>
+
+<p>We have doubled the original amount of code -- only for deallocation and error handling, we haven't introduced new functionality. And the code is still not safe, since the  functions <code>f()</code> and <code>g()</code> might also throw exceptions. I think you can imagine how complexity further explodes if you implement that. Code becomes totally unreadable, the actual function logic is lost in boilerplate technicalities.</p>
+<p>Note also that we use only two dynamic allocations that require such a complicated logic. Imagine how it might look like for 5, or 10. Furthermore, I have only talked about memory leaks. Problems like dangling pointers or double deletes exist, too, just in case life becomes boring.  </p>
+<h2>The solution: RAII</h2>
+<p>Now the good news: C++ offers us RAII,  Resource Acquisition Is Initialization. RAII is a simple yet extremely powerful idiom to manage resources automatically. It is not limited to memory, it can handle arbitrary resources (files, network connections, mutexes, ...). It is based on the fact that destructors can perform any cleanup code as soon as a variable falls out of scope. This code is guaranteed to be executed, whether the function is left by a return value or an exception, and the execution takes place automatically.</p>
+<p>In C++, RAII on pointer level is implemented through smart pointers. These are class templates that acquire a resource (a pointer to dynamically managed memory) in the constructor and release it in the destructor, by calling the<code>delete</code> operator automatically. On  array level, RAII is implemented through containers, i.e. collections of multiple objects of the same type.  STL containers such as <code>std::vector</code> are the most famous examples in the standard library. This article focuses on smart pointers to demonstrate RAII, but most of the points apply to RAII in general.</p>
+<p>In C++11, the standard smart pointer <code>std::unique_ptr</code> was introduced. It is a simple wrapper around a pointer, and essentially does nothing more than deleting the object in its destructor. This has the effect that smart pointers falling out of scope <em>automatically</em> destroy their contained objects. This is important; the whole point of RAII is to move away from manual memory management and the troubles coupled to it.</p>
+<p>What our previous code looks like with the use of smart pointers: </p>
+<pre><span class="code-keyword">int</span> safe()
+{
+    std::unique_ptr&lt;A&gt; a(<span class="code-keyword">new</span> A);
+
+    <span class="code-keyword">if</span> (a->f())
+    {
+        std::unique_ptr&lt;B&gt; b(<span class="code-keyword">new</span> B);
+        <span class="code-keyword">if</span> (b->f())
+            <span class="code-keyword">return</span> b->g();
+        <span class="code-keyword">else</span>
+            <span class="code-keyword">return</span> a->g();
+    }
+    
+    <span class="code-keyword">return</span> 0;
+}</pre>
+
+<p>Our code has the same length as the very first snippet and is completely safe. We can introduce further <code>return </code> or <code>throw </code> statements without touching memory management. Also, we do not get into trouble if one of the called constructors or functions begins to use exceptions. Code remains very clean, and we have zero performance overhead. Neither speed, nor memory.</p>
+<p>As you see, advantages of RAII are far from little. This idiom is extremely powerful; in fact it is so effective that even languages with garbage collectors have started to implement a weak form of it (e.g. <code>using</code> in C#, or try-with-resources in Java).</p>
+<h2>Legitimate use cases for manual memory management</h2>
+<p>This is not a sort of a compromise paragraph that tells you &quot;RAII is not the holy grail, it also has many disadvantages where alternatives are appropriate&quot;. No. Whenever you can use RAII, do it. In almost all situations, there are no rational reasons against it (the esoteric ones are covered in the next section). Actually, RAII is one of the few techniques where one can really state that it should be the default approach, and you must have strong, justified reasons to deviate from it.</p>
+<p>So what are those reasons? In short, low-level tasks. In order to implement automatic memory management, you  need manual memory management. Smart pointers  invoke the <code>delete</code> operator internally. Container allocators may allocate memory using <code>new[]</code>. <em>However</em>, and this is crucial, this usage must be encapsulated at all costs. The API user is not supposed to interfere with  memory management directly, everything should happen behind the scenes. For this very reason, APIs that require the user to use <code>new</code>/<code>delete</code> (or other forms of manually managed resources, such as <code>create()</code>/<code>destroy()</code>function pairs) can be improved using RAII and C++11 move semantics.</p>
+<p>The trend goes more and more into the direction where the user does not even <em>know</em> about the memory management. C++14 introduces the <code>make_unique()</code> function template, which makes it possible to get rid of every single <code>new</code> and <code>delete</code> in end-user code. Even the allocation is encapsulated, which has the nice side effect of mentioning the type only once (and performing internal optimizations in the case of <code>make_shared()</code>):</p>
+<pre>std::unique_ptr&lt;T&gt; ptr(<span class="code-keyword">new</span> T(...));<span class="code-comment">  // is the same as</span>:
+<span class="code-keyword">auto</span> ptr = std::make_unique&lt;T&gt;(...); <span class="code-comment">// no new here!</span></pre>
+<h2> Common myths</h2>
+<p>Since there are up to this day people who constantly construct reasons to avoid RAII and who stick to ancient code techniques in spite of better knowledge, I will try to investigate several myths and logical fallacies related to RAII that I have encountered again and again over the years.</p>
+<p><strong>1. &quot;I am using new/delete because I need more control over my code. I want to determine exactly when my objects are created and destroyed.&quot;</strong></p>
+<p>RAII does not take away control. It does not dictate the lifetime of objects, it only limits it to a scope. You are still able to perform initialization after the definition and destruction before the end of the scope (e.g. using <code>std::unique_ptr::reset()</code>). If you need an object to outlive the scope, then choose a wider scope for it, or transfer ownership to a different object that lives long enough.</p>
+<p><strong>2. &quot;RAII implies overhead&quot;</strong></p>
+<p>This is as wrong as saying that OOP has overhead, because RAII specifies a concept and not a specific implementation thereof. As we know, C++ widely follows the zero-abstraction overhead principle, meaning that encapsulation within classes and functions does not affect the performance per se. In fact, <code>std::unique_ptr</code> has been designed with exactly this principle in mind: it does not use additional memory or  processing cycles. A class object containing only a pointer will be replaced by the pointer itself and function calls will be inlined, leaving binary code that is equivalent to the hand-written version. </p>
+<p>There are many situations where the usage of RAII can even improve performance. Since code that manages memory manually is typically more complex than the automatic equivalent, it is more difficult for the compiler to optimize it. Concerning STL containers, their destructors are usually implemented as a loop iterating over each element and calling its destructor. If this destructor call leads to a <code>delete</code> call on the object (by a smart pointer), then the whole deallocation can be performed in one pass. On the other hand, hand-written code iterating over each element and calling <code>delete</code> effectively duplicates the effort of iteration, and with it the possibility of cache misses.</p>
+<p>Note that <code>std::shared_ptr</code> is a different story. This smart pointer <em>does</em> have overhead due to reference-counting, thread safety and dynamic deleters. What people often forget though, is that handcrafting those features is not free, either. Nevertheless, use shared pointers with care. A mistake that many people new to smart pointers make is overusing them. Do not use shared pointers as a replacement for GCs, use them only when you have shared ownership -- which occurs rather rarely.</p>
+<p><strong>3. &quot;Memory management is only unsafe when you use it incorrectly/in an unsafe way&quot;</strong></p>
+<p>This is a typical logical fallacy based on circular logic. The assumption is that <code>new</code>/<code>delete</code> operators are safe as long as you use them safely. What is left out in this reasoning are all the cases where the  operators are not used safely. As the example code above shows, these cases are not rare at all, even seemingly simple code can introduce loads of mistakes. Smart pointers, on the other hand, are much harder to use incorrectly, see also the next point.</p>
+<p>The other reason leading to this statement is a misguided estimate of the actual complexity. Programmers, and especially C++ programmers, tend to consider themselves experienced as soon as they have worked with a language feature successfully for a few times. The basic concept of <code>new</code> and <code>delete</code> is delusively simple: one operator allocates, the other one deallocates. It is not obvious that this simplicity does not scale in more complex scenarios, where object inter-dependencies, order of destruction or exception safety have to be considered. Unless something goes wrong, one will not  notice that there is a problem; with respect to memory leaks, things <em>can</em> even go wrong, yet nobody will notice.</p>
+<p><strong>4. &quot;Many people use smart pointers incorrectly&quot;</strong></p>
+<p>While this may or may not be true, the statement has no effect on the advantages of smart pointers whatsoever. There are always people who don't use a feature correctly; this on its own is not an argument against the feature. Furthermore, the number of people who use smart pointers incorrectly is significantly smaller than the number of people who use <code>new</code> and <code>delete</code> incorrectly -- simply because smart pointers are easier to use and much more forgiving. </p>
+<p><strong>5. &quot;Unique pointers are overkill in this situation&quot;</strong></p>
+<p>This statement is based on the assumption that unique pointers add certain weight to the code; something you wouldn't have with a hand-crafted solution. However, as explained above, RAII per se has no overhead, thus the weight cannot relate to memory or CPU costs. What then?</p>
+<p>Talking about &quot;client code&quot; (as opposed to the legitimate use cases mentioned above), it is inconsistent to use smart pointers sometimes and sometimes not, because the decision on when to use them is arbitrary. There is no rational criterion determining a point in complexity, until which it is reasonable to abandon RAII -- especially considering the fact that the code may expand in the future. Since RAII requires no additional effort (the exact opposite is true), there is no reason not to use it from the beginning.</p>
+<p><strong>6. &quot;Using RAII is a matter of taste&quot;</strong></p>
+<p>Safety is never a matter of taste. Saying it is is not only ignorant of all the rational arguments for RAII, but also has a negative effect on co-developers and other people who come in contact with one's code. This argument is often brought by people who have programmed their way for years and who are too narrow-minded to consider alternatives, even if those are superior from an objective perspective.</p>
+<p><strong>7. &quot;Smart pointers have an ugly syntax&quot;</strong></p>
+<p>The differences in syntax between raw and smart pointers are tiny, by design. This concerns mainly the declaration (<code>std::unique_ptr&lt;T&gt;</code> vs. <code>T*</code>) and some method calls (<code>p.reset(x);</code> vs. <code>p = x;</code>). What people coming up with this argument completely dismiss is the fact that manual memory management makes the code considerably more verbose, if used correctly. See also the code example above.</p>
+<p>...not to mention the high price you are going to pay for a slightly different syntax.</p>
+<p><strong>8. &quot;I cannot use smart pointers because my compiler doesn't support C++11&quot;</strong></p>
+<p>While it is true that you cannot use <code>std::unique_ptr</code> and <code>std::shared_ptr</code> under these circumstances, this doesn't imply you have to abandon RAII completely. The RAII idiom is present since the first C++ standard in 1998, and possibly  much longer. The standard library contains <code>std::auto_ptr</code> (which has been deprecated meanwhile, but is still better than raw <code>new</code>/<code>delete</code>), the TR1 (extension to the standard implemented by many compilers) provides <code>std::tr1::shared_ptr</code> and the Boost libraries have contained <code>boost::scoped_ptr</code> and <code>boost::shared_ptr</code> for ages. Even in case you really cannot use any of these solutions, the implementation of a minimalistic<code>scoped_ptr</code>-like smart pointer is a matter of minutes which will pay off for the rest of your life. Searching a single memory leak takes much longer than writing such a class template.</p>
+<p><strong>9. &quot;A lot of successful and popular software projects don't strictly use RAII, they must have a good reason why&quot;</strong></p>
+<p>Unfortunately, no. The spread of a habit doesn't allow direct conclusions about its quality. C++ has always been a language that posed virtually no restrictions on the way you can write code. The particular problem with C++ is that since its first standardization in 1998, the way how it has been used has altered massively, even during the time where the language itself was left unchanged. A lot of idioms and best practices have only emerged gradually over the years, and not all developers have witnessed them. One and a half decades later, there is still much legacy code around, and sadly sometimes even new code is written as if there had been no progress. One problem is the sheer complexity of C++ and the difficulty to keep up-to-date, another the tremendous amount of questionable literature and existing code, inspiring newcomers to adopt obsolete techniques.</p>
+<h2>Conclusion</h2>
+<p>This article explained why manual memory management is problematic, and why even trivial programs built on it can cause endless issues. RAII, on the other hand, is a simple and powerful idiom that mitigates those problems at no cost, making code more robust and readable. The only case where you should use <code>new</code>, <code>new[]</code>, <code>delete</code> or <code>delete[]</code> directly is inside the implementation of low-level primitives such as smart pointers or containers. Encapsulate them, so that their users can benefit from the easy-to-use API. This article is not about avoiding raw pointers, but rather about avoiding raw pointers that own memory and thus require manual memory management.</p>
+<p><em>Use RAII, and memory leaks are a problem of the past.</em></p>
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

@@ -1,0 +1,83 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Particles Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Particles Tutorial  </h1>
+  <p>Welcome to  the Particles tutorial. It will teach you how to use the particle system in the  Thor Library. Fundamentally, there are multiple entities which lead in  combination to the rendering of particles on the screen:</p>
+  <ul>
+    <li>The  actual particle system, which stores and renders the particles</li>
+    <li>Particle  affectors which influence particles during their lifetime</li>
+    <li>Particle  emitters that create new particles and provide them with initial conditions</li>
+  </ul>
+  <p><img src="particles.png" /></p>
+  <h2>The <code>ParticleSystem</code> class</h2>
+  <p>This class  is the core of Thor’s Particles module. It holds containers of particles and  provides an interface to update and draw them. Every <code>ParticleSystem</code> instance is  initialized with a <code>sf::Image</code> representing the particle’s texture. Inside the  same system, all particles use the same texture. Let’s define a particle system  that uses a given image for the particles:</p>
+<pre>sf::Image image;
+… <span class="code-comment">// Load image
+</span>thor::ParticleSystem system(image);
+</pre>
+
+<p>Important  are two member functions. First, a method called <code>Update()</code> applies translation,  rotation and scale to each particle. It emits new particles and affects  existing ones, according to the time that has passed. A parameter stands for the  frame time, which can be extracted from a <code>sf::RenderWindow</code> via <code>GetFrameTime()</code>.  The other important method is <code>Draw()</code> which renders the particles on your  screen, using the current <code>sf::View</code>.</p>
+<p>Given you declared a <code>sf::RenderWindow</code> named  <code>window</code>, insert the following lines into your main loop:</p>
+<pre><span class="code-comment">// Update particle system
+</span>system.Update(window.GetFrameTime());
+
+<span class="code-comment">// Draw particle system
+</span>window.Clear();
+system.Draw(window);
+window.Display();</pre>
+<h2>The <code>Emitter</code> class</h2>
+<p>Before a  particle system is able to manipulate and draw any particles, the latter must  be created somehow. This is the task of the particle <em>emitters</em>. Emitters are positioned inside the world and emit  particles into the near area, also called the <em>emission zone</em>. There are several parameters to set, for example emission rate or lifetime of the emitted particles.</p>
+<p> The class  <code>thor::Emitter</code> is the abstract base of concrete emitter types, such as <code>DirectionalEmitter</code> or <code>TargetEmitter</code>. You mostly deal with shared pointers to those types;  therefore you will find a typedef <code>Ptr</code> in each emitter class. An emitter <code>shared_ptr</code> can be attached to a particle system using <code>thor::ParticleSystem::AddEmitter()</code>. By doing so, you tell the <code>ParticleSystem</code> that it may use your emitter as a source of particles for the system. As soon  as the particles are emitted, the <code>ParticleSystem</code> object takes control of them  and manages them.</p>
+<p> For  example, we define an emitter that creates particles inside a circular area,  and attach it to the particle system:</p>
+<pre><span class="code-comment">// Create emitter that emits 30 particles per second, of which each lives for 5 seconds
+</span>thor::Emitter::Ptr emitter = thor::DirectionalEmitter::Create(30.f, 5.f);
+system.AddEmitter(emitter);</pre>
+
+<p>That’s it!  Now the particles are automatically emitted. You can also use  <code>CreateCircleEmitter()</code> as a temporary expression, if you don’t need access to  the emitter afterwards (for example to move it).</p>
+<h2>The <code>Affector</code> class</h2>
+<p>Things get  interesting when you want to influence particles after their emission. For this  purpose, the Thor library supplies you with particle <em>affectors</em>.  There is an abstract base class <code>thor::Affector</code>, as well as concrete derived  classes specifying different affector mechanisms. An example is the force  affector, which accelerates particles during their lifetime.</p>
+<p> Like  emitters, affectors are stored inside <code>shared_ptr</code> objects and are attached to a  <code>ParticleSystem</code>. Every frame, the particle system invokes each of the attached  affectors and lets them modify the particles. A simple example of an affector  that introduces a fade-out effect during the last quarter looks like this:</p>
+<pre>thor::Affector::Ptr affector = thor::FadeOutAffector::Create(0.1f);
+system.AddAffector(affector);</pre>
+
+<h2>Customization [advanced]</h2>
+<p>There is  not much to say here: You can easily provide your own emitter or affector class  by deriving from <code>thor::Emitter</code> or <code>thor::Affector</code> and overriding the pure  virtual functions. Take a look at the documentation for further information.<br />
+</p>
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

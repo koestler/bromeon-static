@@ -1,0 +1,151 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon - Thor C++ Library</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Events Tutorial  </h1>
+  <div class="warning-box">
+  <!--<span class="important">Deprecated tutorial</span> <br />-->
+  <code>thor::SfmlEventSystem</code> which is treated in this tutorial has been replaced by the far more powerful <code>thor::ActionMap</code>. This tutorial is outdated, consider the <a href="../v1.1/tutorial-actions.html">Actions tutorial</a> instead.  
+  </div>
+  <p>Welcome to the tutorial about the Events module. Here, you will learn how to build up an object-oriented event system. From SFML, you know the procedural way of event handling, namely polling:</p>
+<pre>
+<span class="code-keyword">while</span> (window.PollEvent(event))
+{
+    <span class="code-comment">// switch on event type</span>
+}</pre>
+
+<p>However, this approach has a few drawbacks. You  have to differentiate the types explicitly, and your code reacting to the  events is gathered in one place.
+The Events  module of the Thor Library offers you an alternative, where the event  generation is separated from the reactions to events. Events act as triggers  that are connected with function calls. Let&rsquo;s call the functions associated to  the different event types &ldquo;listeners&rdquo; (in principle the same as &ldquo;callbacks&rdquo; or  &ldquo;slots&rdquo;). </p>
+<h2>Event-listener connections </h2>
+<p>Using the  class <code>thor::SfmlEventSystem</code>, you can associate different event types with  different functions. Let&rsquo;s start with an example of a function that is called  upon key presses and outputs the ASCII character of the pressed key:<br />
+<pre><span class="code-keyword">void</span> WriteKey(sf::Event event)
+{
+&nbsp;&nbsp;&nbsp;&nbsp; std::cout &lt;&lt; <span class="code-string">"Text entered: "</span>;
+&nbsp;&nbsp;&nbsp;&nbsp; std::cout &lt;&lt; <span class="code-keyword">static_cast</span>&lt;<span class="code-keyword">char</span>&gt;(event.Text.Unicode) &lt;&lt; std::endl;
+}</pre>
+
+
+<p>Now the part  that actually registers this function and couples it with the <code>TextEntered</code> event  type:
+<pre>thor::SfmlEventSystem system(window); <span class="code-comment">// window is a sf::Window (or derived)</span>
+system.Connect(sf::Event::TextEntered, &amp;WriteKey);
+</pre>
+
+  Simple, isn&rsquo;t it? But nevertheless, the mechanism is quite powerful. The second  parameter can not only be a pointer to function like in the above example,  rather any callable is allowed. The only limitations are the return type (which  must be <code>void</code>) and the signature (a single parameter of <code>sf::Event</code> or compatible,  like <code>const sf::Event&amp;</code>). That is, you can also pass function objects,  especially instances of <code>std::tr1::function</code>. Besides, you are able to connect any number  of listeners to one event type (even the same listener twice, which leads to  two calls). Have a look at a function that closes a window:</p>
+  <pre><span class="code-keyword">void</span> CloseWindow(sf::Window&amp; window)
+{
+&nbsp;&nbsp;&nbsp; window.Close();
+}</pre>
+
+<p>Here, we  can&rsquo;t register <code>CloseWindow()</code> directly at the event system, because the  parameter list doesn&rsquo;t match (<code>sf::Window&amp;</code> vs. <code> sf::Event</code>). But we  can build a function object:
+<pre>
+<span class="code-keyword">struct</span> WindowCloser
+{
+&nbsp;&nbsp;&nbsp; <span class="code-keyword">explicit</span> WindowCloser(sf::Window&amp; window)
+&nbsp;&nbsp;&nbsp; : window(window)
+&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp; }
+
+&nbsp;&nbsp;&nbsp; <span class="code-keyword">void</span> <span class="code-keyword">operator</span>() (sf::Event)
+&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp; window.Close();
+&nbsp;&nbsp;&nbsp; }
+
+&nbsp;&nbsp;&nbsp; sf::Window&amp; window;
+};</pre>
+
+<p>Then the  registration looks like this:</p>
+<pre>
+system.Connect(sf::Event::Closed, WindowCloser(window));</pre>
+
+<h2>Binders [advanced]</h2>
+<p>This is a  chapter that requires rather advanced C++ knowledge, so depending on your  skills, you might want to skip it. You can use the whole functionality of the  event systems in Thor without binders, however they can simplify things. 
+  <p>You may  think, the functor <code>WindowCloser</code> needs quite a lot code to achieve a single-line  functionality. You are right. Fortunately, C++ offers other ways, namely  binders. The library Boost.Bind (which has made it into TR1) contains a bunch  of tools to compose new functions on-the-fly. If you are unfamiliar to binders,  you should have a look at the Boost documentation – you don&rsquo;t need Boost though,  the TR1 is enough. First, we write two lines to simplify the usage of the TR1  namespaces (be sure to avoid that in header files):
+  <pre>
+<span class="code-keyword">using</span> <span class="code-keyword">namespace</span> std::tr1::placeholders;
+<span class="code-keyword">namespace</span> tr1 = std::tr1;
+</pre>
+
+  Using the  function <code>CloseWindow()</code> from above, the registration looks like the following.  You need <code>tr1::ref</code> to pass the window as reference.
+<pre>system.Connect(sf::Event::Closed, tr1::bind(&amp;CloseWindow, tr1::ref(window)));</pre>
+
+<p>We got rid  of the class and all the constructor/member/initialization stuff. But honestly,  that annoying function does nothing more than forwarding a call to a member.  Since binders support member functions, why not use them to call  <code>sf::Window::Close()</code> directly?</p>
+<pre>
+system.Connect(sf::Event::Closed, tr1::bind(&amp;sf::Window::Close, &amp;window));</pre>
+
+<p>Now all the  functionality is contained in a single line, and we are relieved from writing  boilerplate code. A more complex use case involves moving a sf::Shape instance to the position where the mouse is clicked. This time we are using placeholders to forward  arguments, and pointers instead of references. First, the function:</p>
+<pre><span class="code-keyword">void</span> ReadMousePosition(sf::Event event, sf::Shape* shape)
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">float</span> x = <span class="code-keyword">static_cast</span>&lt;<span class="code-keyword">float</span>&gt;(event.MouseButton.X);
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">float</span> y = <span class="code-keyword">static_cast</span>&lt;<span class="code-keyword">float</span>&gt;(event.MouseButton.Y);
+
+&nbsp;&nbsp;&nbsp;&nbsp; shape-&gt;SetPosition(x, y);
+}</pre>
+
+And on the other side, we register the function:
+<pre>sf::Shape shape = …;
+system.Connect(sf::Event::MouseButtonPressed, tr1::bind(&amp;ReadMousePosition, _1, &amp;shape));</pre>
+
+
+<h2>Embedding the event system  to the game loop</h2>
+<p>Up to now,  you have only heard half the story. You have seen how to connect events  with listeners, but you don&rsquo;t know how these events are generated. If we have a  simple game loop:</p>
+<pre><span class="code-keyword">while</span> (window.IsOpened())
+{
+&nbsp;&nbsp;&nbsp; window.Display();
+}</pre>
+The integration of the event system is very straightforward:
+<pre><span class="code-keyword">while</span> (window.IsOpened())
+{
+&nbsp;&nbsp;&nbsp; system.PollEvents();&nbsp;&nbsp;&nbsp;&nbsp; 
+&nbsp;&nbsp;&nbsp; window.Display();
+}</pre>
+<h2>Removing connections</h2>
+<p>You now  know how to add event-listener connections, but not how to remove them from the  system as soon as they aren&rsquo;t needed anymore. The member function <code>Connect()</code> returns an object of type <code>thor::Connection</code> which exists exactly for this  purpose. You can store it and call its method <code>Disconnect()</code> later to disconnect  the listener from the event.</p>
+<pre>thor::Connection connection = system.Connect(sf::Event::KeyPressed, &amp;OutputKey);
+connection.Disconnect();</pre>
+
+<p>A  connection automatically becomes invalid when the referenced listener is  disconnected, so you can&rsquo;t disconnect a listener accidentally more than once. To  disconnect all listeners associated with a given event type, call <code>SfmlEventSystem::ClearConnections()</code>.</p>
+<h2>Event forwarding [advanced]</h2>
+<p>There are  situations where you don&rsquo;t want a single event system to take control over all  your input handling. For example, you cannot call <code>sf::Window::PollEvent()</code> anymore, when a <code>thor::SfmlEventSystem</code> is taking the window&rsquo;s events.  That&rsquo;s why <code>SfmlEventSystem</code> provides a mechanism to inform other objects about  the occurred events. A typical use case is some sort of GUI hierarchy, where  every component has a method <code>OnEvent()</code>. Let&rsquo;s use a global function as a  placeholder:</p>
+<pre><span class="code-keyword">void</span> OnEvent(sf::Event event)
+{
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// Do something with event
+</span>}</pre>
+<p>To forward  every event to this function, you have call <code>ForwardEvents()</code>:</p>
+<pre>system.ForwardEvents(&amp;OnEvent);</pre>
+
+The behavior is very similar to <code>Connect()</code>: The  parameter is a <code>std::tr1::function&lt;void(const  Event&amp;)&gt;</code> and the return type is a <code>thor::Connection</code>. Use  <code>ClearEventForwarders()</code> to disconnect all forwarding functions at once.</div>
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

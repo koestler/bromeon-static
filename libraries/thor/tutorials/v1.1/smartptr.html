@@ -1,0 +1,213 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Smart Pointer Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Smart Pointer Tutorial  </h1>
+  <p>Smart pointers are a very helpful tool to avoid manual memory management and all the issues connected with it (memory leaks, unclear ownership semantics, double deletions, exception safety, ...). Basically, smart pointers are class templates that encapsulate a raw pointer and free memory  in the destructor. This makes RAII possible, a fundamental idiom for resource management in modern C++.</p>
+  <p>C++ libraries contain various smart pointer implementations which mainly differ in the way ownership is managed. The most important ownership semantics are:</p>
+  <ul>
+    <li><p><strong>Unique ownership<br />
+    </strong> There is only one smart pointer referring to an object at the same time and the smart pointer cannot be copied.<br />
+    Examples: <code>boost::scoped_ptr</code>, <code>thor::ScopedPtr, std::unique_ptr</code> (C++11,   can be explicitly moved however)</p>
+    </li>
+    <li><p><strong>Moved ownership<br />
+      </strong>The object is still owned by only one pointer, but the ownership can be implicitly transferred to other smart pointers.<br />
+    Examples: <code>std::auto_ptr</code>, <code>thor::MovedPtr</code></p></li>
+    <li><p><strong>Shared ownership<br />
+    </strong>Multiple smart pointers can refer to a single object, a reference counter is responsible that the last smart pointer deallocates memory.<br />
+    Example: <code>std::tr1::shared_ptr</code></p></li>
+    <li><p><strong>Copied ownership</strong><br />
+      Every time a smart pointer is copied, the object behind it is also copied. This is extremely useful in combination with polymorphism.<br />
+    Example: <code>thor::CopiedPtr</code></p></li>
+  </ul>
+  <h2>Design </h2>
+  <p>With the C++98 standard library and TR1, there are three smart pointers available: <code>auto_ptr</code>, <code>shared_ptr</code> and  <code>weak_ptr</code> (which is always used together with <code>shared_ptr</code>). For many use cases, this is not enough. Thor provides three additional smart pointer types that are ready-to-use for arbitrary types. The intention is to abstract from low-level techniques like manual memory management, overloads of <em>The Big Three</em>, and worries about pointer validity.</p>
+  <p>Thor's SmartPtr module comes with low requirements. It is header-only and completely independent of SFML, so you can directly use it in your project.</p>
+  <p> For every smart pointer in Thor, the pointee type needn't be complete at the time of declaration. This behavior is adapted from raw pointers.</p>
+  <pre><span class="code-keyword">class</span> Pointee; <span class="code-comment">// incomplete type
+</span>
+Pointee*                  rawPointer;
+thor::ScopedPtr&lt;Pointee&gt;  smartPointer;</pre>
+
+
+  <p>The type needs only be complete when you initialize the smart pointer with a valid pointer. The advantage of this technique are lower dependencies, especially in  header files. When you have the following class definition, there is no need to include  the definition of the type <code>Pointee</code>, so the client doesn't have to know it. As a result, the compilation is faster, and changes in the definition of <code>Pointee</code> require no recompilation. This helps you to implement idioms such as <em>Pimpl</em>.</p>
+  <pre><span class="code-keyword">class</span> Pointee; <span class="code-comment">// forward declaration
+</span>
+<span class="code-keyword">class</span> MyClass
+{
+&nbsp;&nbsp;&nbsp;&nbsp; thor::ScopedPtr&lt;Pointee&gt; ptr;
+};</pre>
+  <p>Furthermore, Thor's smart pointers do not provide implicit conversions from and to raw pointer types. While these conversions may seem convenient, they can lead to unwanted behavior in many situations.</p>
+<h2>Basic operations</h2>
+  <p>All smart pointers support the overloaded operators <code>*</code> and <code>-&gt;</code> for dereferencing as well as a conversion to a bool-like type to test for validity.</p>
+  <pre>thor::ScopedPtr&lt;MyClass&gt; ptr;
+<span class="code-keyword">if</span> (ptr) 
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// ptr points to a valid object
+</span><span class="code-keyword">if</span> (!ptr)
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// ptr is empty (NULL)</span></pre>
+
+  <p>The member function <code>Reset()</code> sets the pointer to a new object or to NULL, when no argument is passed.</p>
+  <pre>ptr.Reset(<span class="code-keyword">new</span> MyClass); <span class="code-comment">// Destroys old object, assigns new object</span>
+ptr.Reset();<span class="code-comment">            // Destroys old object, assigns NULL</span></pre>
+  <h2>Scoped pointers</h2>
+  <p>The class template <code>thor::ScopedPtr</code> is a simple smart pointer that invokes the destructor and <code>delete</code> operator of an object as soon as it goes out of scope. This smart pointer cannot be copied or assigned.</p>
+  <p>You can use it for the RAII idiom:</p>
+<pre><span class="code-keyword">int</span> main()
+{
+&nbsp;&nbsp;&nbsp;&nbsp; thor::ScopedPtr&lt;MyClass&gt; ptr(<span class="code-keyword">new</span> MyClass);
+&nbsp;&nbsp;&nbsp;&nbsp; ptr-&gt;DoSomething();
+} <span class="code-comment">// End of block: delete operator is called</span></pre>
+<h2>Movable pointers </h2>
+<p><code>thor::MovedPtr</code> can be used to transfer ownership from a smart pointer to another. A use case is a factory function that creates an object which is passed to the caller:</p>
+<pre>thor::MovedPtr&lt;MyClass&gt; CreateObject()
+{
+&nbsp;&nbsp;&nbsp;&nbsp; thor::MovedPtr&lt;MyClass&gt; ptr(<span class="code-keyword">new</span> MyClass);
+&nbsp;&nbsp;&nbsp;&nbsp; ptr-&gt;DoSomething();
+
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">return</span> ptr;
+}</pre>
+
+<p>Smart pointers with implicit move semantics are useful in many situations, but you have to be careful because they don't behave as expected when it comes to copies and assignments. The copy constructor and copy assignment operator of <code>thor::MovedPtr </code>modify the origin:</p>
+<pre>thor::MovedPtr&lt;MyClass&gt; first(<span class="code-keyword">new</span> MyClass);
+thor::MovedPtr&lt;MyClass&gt; second = first;
+<span class="code-comment">// first is now empty, object moved to second</span></pre>
+
+<h2>Copyable pointers</h2>
+<p>This chapter treats smart pointers with deep copy semantics. <code>thor::CopiedPtr</code> provides three different  policies that specify how a copy is performed. You can also use your own policy to customize the behavior. The copy policy corresponds to the second template parameter of<code> thor::CopiedPtr</code>.</p>
+<p>The simplest policy is <code>thor::StaticCopy</code>, it  invokes the copy constructor of the pointee object:</p>
+<pre>thor::CopiedPtr&lt;MyClass, thor::StaticCopy&gt; first(<span class="code-keyword">new</span> MyClass);
+thor::CopiedPtr&lt;MyClass, thor::StaticCopy&gt; second = first;
+<span class="code-comment">// Object in first is copied to second, *first == *second</span></pre>
+<p>Things become  more interesting when dynamic polymorphism is involved. Let's assume we have the following class hierarchy (we abandon const-correctness for simplicity): </p>
+
+<pre><span class="code-keyword">class</span> Base
+{
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">public</span>:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">virtual</span> ~Base() {}
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">virtual</span> Base* Clone() = 0;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">virtual</span> <span class="code-keyword">int</span> Number() = 0;
+};
+
+<span class="code-keyword">class</span> Derived1 : <span class="code-keyword">public</span> Base
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">public</span>:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; <span class="code-keyword">virtual</span> Derived1* Clone() { <span class="code-keyword">return new</span> Derived1(*this); }
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  <span class="code-keyword">virtual</span> <span class="code-keyword">int</span> Number() { <span class="code-keyword">return</span> 1; }
+};
+
+<span class="code-keyword">class</span> Derived2 : <span class="code-keyword">public</span> Base
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">public</span>:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  <span class="code-keyword">virtual</span> Derived2* Clone() { <span class="code-keyword">return new</span> Derived2(*this); }
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; <span class="code-keyword">virtual</span> <span class="code-keyword">int</span> Number() { <span class="code-keyword">return</span> 2; }
+};</pre>
+<p>The virtual function <code>Clone()</code> returns an identical object of the derived type. Now we declare two base smart pointers  with the <code>thor::VirtualClone</code> policy to make use of the <code>Clone()</code> function for deep copying. </p>
+<pre>thor::CopiedPtr&lt;Base, thor::VirtualClone&gt; p, q;
+p.Reset(<span class="code-keyword">new</span> Derived1);  <span class="code-comment">// p->Number() == 1
+</span>q.Reset(<span class="code-keyword">new</span> Derived2);  <span class="code-comment">// q->Number() == 2
+</span>
+q = p; <span class="code-comment">// Perform deep copy, destroy Derived2 object
+</span><span class="code-comment">// p->Number() == 1 and q->Number() == 1</span></pre>
+<p>The smart pointer objects have usual value semantics: We can copy and assign them, and internally the right derived object is chosen. The deep copy is safe, no object slicing occurs.</p>
+<p>But defining this <code>Clone()</code> function in every class in inconvenient. Forgetting it may lead to object slicing if the function has already been defined in a base class. Unfortunately, we have to define it, or how should the pointer know in which way the object is copied?</p>
+<p>What if I told you that we actually don't? Indeed, no <code>Clone()</code> function is required to perform  deep copies across a polymorphic class hierarchy. And don't be afraid: We don't need any <code>dynamic_cast</code>, <code>typeid</code>, <code>switch</code> or <code>if-else</code>-cascade either. There is a very elegant solution encapsulated in <code>thor::CopiedPtr</code> combined with the <code>thor::DynamicCopy</code> policy.</p>
+<p>After removing all the <code>Clone()</code> methods from the three classes, we can write the following, just as above:</p>
+<pre>thor::CopiedPtr&lt;Base, thor::DynamicCopy&gt; p, q;
+p.Reset(<span class="code-keyword">new</span> Derived1);  <span class="code-comment">// p->Number() == 1
+</span>q.Reset(<span class="code-keyword">new</span> Derived2);  <span class="code-comment">// q->Number() == 2
+</span>
+q = p; <span class="code-comment">// Perform deep copy, destroy Derived2 object
+</span><span class="code-comment">// p->Number() == 1 and q->Number() == 1</span>
+</pre>
+<p>It <em>does</em> work. In case you wonder why: The constructor and <code>Reset()</code> are function templates that recognize the actual  type of the <code>new</code>-expression. By knowing the dynamic type, it is possible to invoke the corresponding copy constructor. On the other side, you can't do something like this:</p>
+<pre>thor::CopiedPtr&lt;Base, thor::DynamicCopy&gt; p, q;
+Base* raw = <span class="code-keyword">new</span> Derived1;
+p.Reset(raw);
+q = p;</pre>
+
+<p>The pointer passed to <code>Reset()</code> is of type <code>Base*</code> and not <code>Derived1*</code>. Here, the <code>thor::VirtualClone</code> policy would work again.</p>
+<h2>Interaction between CopiedPtr and MovedPtr [advanced]</h2>
+<p>Sometimes we need to take ownership of a <code>CopiedPtr</code> without copying its content. Basically, the <code>Release()</code> function can be invoked to take ownership of a pointer:</p>
+<pre>
+<span class="code-comment">// Transfer ownership from p to q</span>
+thor::CopiedPtr&lt;MyClass, thor::StaticCopy&gt; p(<span class="code-keyword">new</span> MyClass);
+<span class="code-comment"></span>thor::CopiedPtr&lt;MyClass, thor::StaticCopy&gt; q(p.Release());</pre>
+<p>But you need to make sure that the released pointer is immediately assigned to another smart pointer, or you have a memory leak. Anyway, this way becomes problematic as soon as you use the <code>DynamicCopy</code> policy with polymorphic objects, because  <code>Release()</code>only returns a  pointer to the base class. So you lose type information, which is essential for <code>DynamicCopy </code>in order to function correctly.</p>
+<p>There is a much simpler and safer way, namely the function <code>thor::Move()</code>:</p>
+<pre>thor::CopiedPtr&lt;Base, thor::DynamicCopy&gt; p(<span class="code-keyword">new</span> Derived1);
+thor::CopiedPtr&lt;Base, thor::DynamicCopy&gt; q = thor::Move(p);
+<span class="code-comment">// p is now empty, q contains the Derived1 object</span></pre> 
+<p>The <code>Move()</code> function returns a <code>MovedPtr</code> with the same template arguments as the original <code>CopiedPtr</code>. Type information is retained. You can implicitly convert a  <code>MovedPtr</code> object to a  <code>CopiedPtr</code> object:</p>
+<pre>thor::MovedPtr&lt;Base, thor::DynamicCopy&gt; p(<span class="code-keyword">new</span> Derived1);
+thor::CopiedPtr&lt;Base, thor::DynamicCopy&gt; q = p;
+<span class="code-comment">// p is now empty</span></pre>
+<p>On the other side, you may want to copy the contents of a <code>MovedPtr</code> to another <code>MovedPtr</code> without transferring ownership, here you can use <code>thor::Copy()</code>:</p>
+<pre>thor::MovedPtr&lt;Base, thor::DynamicCopy&gt; p(<span class="code-keyword">new</span> Derived1);
+thor::MovedPtr&lt;Base, thor::DynamicCopy&gt; q = thor::Copy(p);
+thor::CopiedPtr&lt;Base, thor::DynamicCopy&gt; r = thor::Copy(p);
+<span class="code-comment">// p still contains the original object, q and r hold copies</span></pre> 
+<p>To sum up, the following conversions are possible: </p>
+<table width="674" border="1">
+  <tr>
+    <th scope="col">Conversion</th>
+    <th scope="col">Transfer object</th>
+    <th scope="col">Copy object</th>
+  </tr>
+  <tr>
+    <td><code>thor::MovedPtr</code> →<code>thor::MovedPtr</code></td>
+    <td>implicitly</td>
+    <td><code>thor::Copy()</code></td>
+  </tr>
+  <tr>
+    <td><code>thor::MovedPtr</code> → <code>thor::CopiedPtr</code></td>
+    <td>implicitly</td>
+    <td><code>thor::Copy()</code></td>
+  </tr>
+  <tr>
+    <td><code>thor::CopiedPtr</code> →<code>thor::MovedPtr</code></td>
+    <td><code>thor::Move()</code></td>
+    <td><code>thor::Copy()</code></td>
+  </tr>
+  <tr>
+    <td><code>thor::CopiedPtr</code> →<code>thor::CopiedPtr</code></td>
+    <td><code>thor::Move()</code></td>
+    <td>implictly</td>
+  </tr>
+</table>
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

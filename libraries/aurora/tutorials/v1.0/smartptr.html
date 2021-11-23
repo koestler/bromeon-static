@@ -1,0 +1,153 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Aurora :: Smart Pointer Tutorial </title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+    <div class="sb-sub2">
+      <div class="sb-cur">
+        <p><a href="../../documentation/index.html">Documentation</a></p>
+      </div>
+      <p><a href="../../download/index.html">Download</a></p>
+      <p><a href="../../tutorials/index.html">Tutorials</a></p>
+    </div>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Smart Pointer Tutorial  </h1>
+  <p>Smart pointers are a very helpful tool to avoid manual memory management and all the issues connected with it (memory leaks, unclear ownership semantics, double deletions, exception safety, ...). Basically, smart pointers are class templates that encapsulate a raw pointer and free memory  in the destructor. This makes RAII possible, a fundamental idiom for resource management in modern C++.</p>
+  <p>C++ libraries contain various smart pointer implementations which mainly differ in the way ownership is managed. The most important ownership semantics are:</p>
+  <ul>
+    <li><strong>Unique ownership<br />
+    </strong> There is only one smart pointer referring to an object at the same time and the smart pointer cannot be copied.<br />
+    Examples: <code>boost::scoped_ptr</code>, <code>std::unique_ptr</code> (C++11,   can be explicitly moved) </li>
+    <li><strong>Shared ownership<br />
+      </strong>Multiple smart pointers can refer to a single object, a reference counter is responsible that the last smart pointer deallocates memory.<br />
+    Example: <code>std::shared_ptr</code> (C++11)</li>
+    <li><strong>Copied ownership</strong><br />
+      Every time a smart pointer is copied, the object behind it is also copied. This is extremely useful in combination with polymorphism.<br />
+    Example: <code>aurora::CopiedPtr</code></li>
+  </ul>
+  <h2>Design decisions</h2>
+<p>For many use cases, the well-known smart pointers (most notably <code>shared_ptr</code> and <code>unique_ptr</code>) are not enough. Aurora provides the class template <code>aurora::CopiedPtr</code> which implements a smart pointer with copied ownership. It has been conceived with the following points in mind:</p>
+<ul>
+  <li><strong>Well-known conventions<br />
+    </strong>Dereferencing operators * and -&gt; and a conversion to a bool-like type imitate raw pointer syntax. Special member functions such as <code>reset()</code> or <code>swap()</code> are named like the standard equivalents. Pointee-level <code>const</code> qualifiers can be added, but not removed.</li>
+  <li><strong>No implicit conversions</strong><br />
+    Conversions
+    from and to raw pointer types without casts or constructor calls are forbidden. While these conversions may seem convenient, they can lead to unwanted behavior in many situations and don't express the presence of a smart pointer in the code.</li>
+  <li><strong>RAII and value semantics</strong><br />
+    Aurora's SmartPtr module encourages the use of the RAII idiom to relieve yourself from manual memory management. This is not only  less error-prone, but makes code much 
+  simpler, especially in presence of multiple return paths and exceptions. Operations like copy, assign, pass to/from function have the same semantics as value types like int.</li>
+  <li><strong>Cloner and deleter strategies using type erasure</strong><br />
+    Lets the user specify cloners and deleters at runtime. The type itself (namely <code>CopiedPtr&lt;T&gt;</code>) is not affected, therefore cloners and deleters are abstracted from the user after initialization. This approach makes it possible to pass  lambda expressions as cloner or deleter functions.</li>
+  </ul>
+<h2>Basic operations</h2>
+<p>The operators <code>*</code> and <code>-&gt;</code> for dereferencing as well as a conversion to a bool-like type to test for validity are provided.</p>
+<pre>aurora::CopiedPtr&lt;MyClass&gt; ptr;
+<span class="code-keyword">if</span> (ptr) 
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// ptr points to a valid object
+</span><span class="code-keyword">if</span> (!ptr)
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// ptr is empty (nullptr)</span></pre>
+<p>The member function <code>reset()</code> sets the pointer to a new object or to nullptr, when no argument is passed.</p>
+<pre>ptr.reset(<span class="code-keyword">new</span> MyClass); <span class="code-comment">// Destroys old object, assigns new object</span>
+ptr.reset();<span class="code-comment">            // Destroys old object, assigns nullptr</span>
+</pre>
+<h2>Deep copies</h2>
+<p>The C++11 standard library and Boost don't provide any smart pointers with deep copy semantics at all. That is, you cannot copy the referenced object in general. The approach <code>new T(*ptr)</code> doesn't work because T might be polymorphic and you don't know the dynamic type, or there might even be no copy constructor.</p>
+<p><code>aurora::CopiedPtr</code> is able to perform deep copies. That means, the pointee (object pointed to) is copied when the pointer is copied.</p>
+<pre>aurora::CopiedPtr&lt;MyClass&gt; first(<span class="code-keyword">new</span> MyClass);
+aurora::CopiedPtr&lt;MyClass&gt; second = first;
+<span class="code-comment">// Object in first is copied to second, *first == *second</span></pre>
+<p>Things become  more interesting when dynamic polymorphism is involved. Let's assume we have the following class hierarchy (we abandon const-correctness for simplicity): </p>
+
+<pre><span class="code-keyword">class</span> B
+{
+&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">public</span>:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">virtual</span>     ~B() {}
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">virtual</span> B*  clone() = 0;
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">virtual</span> <span class="code-keyword">int</span> number() = 0;
+};
+
+<span class="code-keyword">class</span> D : <span class="code-keyword">public</span> B
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">public</span>:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; <span class="code-keyword">virtual</span> D*  clone()  { <span class="code-keyword">return new</span> D(*this); }
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  <span class="code-keyword">virtual</span> <span class="code-keyword">int</span> number() { <span class="code-keyword">return</span> 1; }
+};
+
+<span class="code-keyword">class</span> E : <span class="code-keyword">public</span> B
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">public</span>:
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  <span class="code-keyword">virtual</span> E* clone()   { <span class="code-keyword">return new</span> E(*this); }
+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; &nbsp; <span class="code-keyword">virtual</span> <span class="code-keyword">int</span> number() { <span class="code-keyword">return</span> 2; }
+};</pre>
+<p>The virtual function <code>clone()</code> returns an identical object of the derived type. Now we declare two base smart pointers  with the <code>aurora::VirtualClone</code> cloner to make use of the <code>clone()</code> function for deep copying. </p>
+<pre>aurora::CopiedPtr&lt;B&gt; p(<span class="code-keyword">new</span> D, aurora::VirtualClone&lt;D&gt;());  <span class="code-comment">// p->number() == 1
+</span>aurora::CopiedPtr&lt;B&gt; q(<span class="code-keyword">new</span> E, aurora::VirtualClone&lt;E&gt;()); <span class="code-comment"> // q->number() == 2
+</span>
+q = p; <span class="code-comment">// Perform deep copy, destroy E object. Invokes q.clone() internally.
+</span><span class="code-comment">// p->number() == 1 and q->number() == 1</span></pre>
+<p>The smart pointer objects have usual value semantics: We can copy and assign them, and internally the right derived object is chosen. The deep copy is safe, no object slicing occurs.</p>
+<p>But defining this <code>clone()</code> function in every class in inconvenient. Forgetting it may lead to object slicing if the function has already been defined in a base class. Unfortunately, we have to define it, or how should the pointer know in which way the object is copied?</p>
+<p>What if I told you that we actually don't? Indeed, no <code>clone()</code> function is required to perform  deep copies across a polymorphic class hierarchy. And don't be afraid: We don't need any <code>dynamic_cast</code>, <code>typeid</code>, <code>switch</code> or <code>if-else</code>-cascade either. There is a very elegant solution encapsulated in <code>aurora::CopiedPtr</code> combined with the <code>aurora::OperatorNewCopy</code> policy.</p>
+<p>After removing all the <code>clone()</code> methods from the three classes, we can write the following, just as above:</p>
+<pre>aurora::CopiedPtr&lt;B&gt; p, q;
+p.reset(<span class="code-keyword">new</span> D);  <span class="code-comment">// p->number() == 1
+</span>q.reset(<span class="code-keyword">new</span> E);  <span class="code-comment">// q->number() == 2
+</span>
+q = p; <span class="code-comment">// Perform deep copy, destroy E object
+</span><span class="code-comment">// p->number() == 1 and q->number() == 1</span>
+</pre>
+<p>It <em>does</em> work. In case you wonder why: The constructor and <code>reset()</code> are function templates that recognize the actual  type of the <code>new</code>-expression. By knowing the dynamic type, it is possible to invoke the corresponding copy constructor. On the other side, you can't do something like this:</p>
+<pre>aurora::CopiedPtr&lt;B&gt; p, q;
+B* raw = <span class="code-keyword">new</span> D;
+p.reset(raw);
+q = p;</pre>
+
+<p>The pointer passed to <code>reset()</code> is of type <code>B*</code> and not <code>D*</code>. Here, the <code>aurora::VirtualClone</code> policy would work again.</p>
+<h2>Advantages</h2>
+<p><strong>CopiedPtr&lt;T&gt; vs. T</strong><br />
+You might ask yourself why one wouldn't directly use <code>T</code>. There are several advantages of <code>CopiedPtr&lt;T&gt;</code> over <code>T</code>: </p>
+<ul>
+  <li>It works with polymorphic types</li>
+  <li> It works with noncopyable types (if there's no copy constructor, you can specify a different cloner strategy)</li>
+  <li> The type <code>T</code> needn't be complete at the declaration of <code>CopiedPtr&lt;T&gt;</code>, which reduces header dependencies</li>
+  <li> The smart pointer is movable even if <code>T</code> itself is not</li>
+</ul>
+<p><strong>CopiedPtr&lt;T&gt; vs. T*<br />
+</strong>One can still use raw pointers to achieve some of the points mentioned above. The reasons to prefer <code>CopiedPtr&lt;T&gt;</code> are:</p>
+<ul>
+  <li>RAII, no memory management, exception safety</li>
+  <li>Once the pointer has been initialized, it automatically knows how to copy and destroy its objects. This knowledge is hidden from the user, so one can limit interfaces to a single <code>CopiedPtr&lt;T&gt;</code>  type that works with arbitrary cloners and deleters.</li>
+</ul>
+<h2>Limitations</h2>
+<p>Of course, <code>aurora::CopiedPtr</code> is not the ultimate solution to every problem. There are limitations which are useful to know: </p>
+<ul>
+  <li>Because cloners and deleters can be assigned at runtime, they bring some performance overhead. This concerns memory usage as well as runtime speed during creation, copy construction and destruction of smart pointers (but not dereferencing). So if you don't exploit these features, you'd better use a more basic smart pointer like <code>std::unique_ptr</code>.</li>
+  <li>The <code>aurora::OperatorNewCopy</code> strategy (default cloner) requires a pointer to the derived type to be passed at initialization. You cannot initialize <code>CopiedPtr&lt;Base&gt;</code> with <code>Base*</code> unless you use a different cloner, like <code>aurora::VirtualClone</code>.</li>
+</ul>
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

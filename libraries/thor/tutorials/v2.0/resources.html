@@ -1,0 +1,166 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Resources Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Resources Tutorial  </h1>
+  <p>Welcome to  the tutorial about the Resources module of the Thor Library. Resources, sometimes called assets, are  heavyweight objects that can be loaded from the application, such as images,  fonts, sound files, etc.  In SFML, there exist the following classes with typical resource semantics:</p>
+  <ul>
+    <li><code>sf::Image</code></li>
+    <li><code>sf::Texture</code></li>
+    <li><code>sf::Font</code></li>
+    <li><code>sf::Shader</code></li>
+    <li><code>sf::SoundBuffer</code></li>
+  </ul>
+  <p>Note that <code>sf::Music</code> is a special case; it behaves quite distinctly from the rest. Music is streamed and thus not completely loaded into memory. It has no real data, so shared access makes not much sense.</p>
+  <p>Typically, resources are accessed from different places in the application, requiring certain organization in terms of code. The Thor Resources module provides an interface that simplifies loading and access to  resources. Besides SFML resources, Thor also allows you to integrate your own resource types.</p>
+  <h2>Resource loader</h2>
+<p>As implied by the name, a resource loader knows how to load a resource. It offers a way of passing loading information around and can be invoked to actually load resources when needed.</p>
+<p> A resource loader for an <code>sf::Texture</code> which should be loaded  from a file &ldquo;image.jpg&rdquo; is declared like this:</p>
+<pre>thor::ResourceLoader&lt;sf::Texture&gt; key = thor::Resources::fromFile&lt;sf::Texture&gt;(<span class="code-string">"image.jpg"</span>);</pre>
+
+<p>The  function<code>fromFile()</code>indirects to the loading function  <code>sf::Texture::loadFromFile()</code> and has the same  signature. Thor provides a variety of predefined loaders that correspond to their SFML counterparts.</p>
+<h2>Resource holder</h2>
+<p>The class  template <code>thor::ResourceHolder</code> is the core of the resource management system. It provides a central point to load, access and release resources within your application. The class is based on resource IDs: identifiers that represent names for your resources. Such identifiers can be strings, enums or any types that can act as keys in associative maps. Whenever you access resources, you do so through identifiers.</p>
+<p>The template parameters define the resource type and the ID type, respectively. For example, the following defines a resource holder for texture resources and string IDs:</p>
+<pre>thor::ResourceHolder&lt;sf::Texture, std::string&gt; holder;</pre>
+<p>Resources can be loaded through the <code>acquire()</code> function. The first parameter is the ID, which you want to associate with the resource. The second parameter is the resource loader, which determines how the resource is loaded. In the next example, the texture is loaded from a  file called &ldquo;image.jpg&rdquo;. It is stored using the identifier &ldquo;myID&rdquo;. </p>
+<pre>holder.acquire(<span class="code-string">&quot;myID&quot;</span>, thor::Resources::fromFile&lt;sf::Texture&gt;(<span class="code-string">&quot;image.jpg&quot;</span>));</pre>
+<p>Once the resource is loaded, it can be accessed using the ID. You can either use  <code>acquire()</code>directly, or  <code>operator[]</code>at a later time. Both return a reference to the resource.</p>
+<pre>sf::Texture&amp; texture = holder.acquire(<span class="code-string">&quot;myID&quot;</span>, ...);
+sf::Texture&amp; texture = holder[<span class="code-string">&quot;myID&quot;</span>];</pre>
+<p>If you don't need the resource anymore, you can destroy it with the <code>release()</code>method, the counterpart to <code>acquire()</code>. If you don't release resources manually, they will be released in the <code>ResourceHolder</code> destructor. Make sure that a resource is no longer used after it is released.</p>
+<pre>holder.release(<span class="code-string">&quot;myID&quot;</span>);
+</pre>
+<h2>Error handling</h2>
+<p>All kinds of errors related to <code>ResourceHolder</code> are signaled through exceptions. The primary error source is loading: a file may not exist, data can be corrupt, a network connection breaks down, etc. When <code>acquire()</code> fails to load a resource, it throws a <code>ResourceLoadingException </code>which can be handled at runtime.</p>
+<pre>thor::ResourceHolder&lt;...&gt; holder;
+<span class="code-keyword">try</span>
+{
+   holder.acquire(<span class="code-string">&quot;firstID&quot;</span>, ...);
+   holder.acquire(<span class="code-string">&quot;secondID&quot;</span>, ...);
+   ...
+}
+<span class="code-keyword">catch</span> (thor::ResourceLoadingException&amp; e)
+{
+   std::cout &lt;&lt; <span class="code-string">&quot;Error: &quot;</span> &lt;&lt; e.what() &lt;&lt; std::endl;
+}</pre>
+
+<p>This allows you to load many resources without checking every single call to  <code>acquire()</code>. You can even have your try-catch block far from the place where resources are loaded; this is often  advisable because the local code doesn't know how to deal with such errors and has to propagate them.</p>
+<p>All the methods that access a resource through an ID  fail if that ID is <em>invalid</em>. Invalid means the <code>ResourceHolder</code> stores no resource corresponding to that ID. This can occur if you simply mistype, or if the requested resource has not been loaded, or if it has been released again. In such cases, a different exception is thrown: <code>ResourceAccessException</code>. Exceptions of this type should occur far less frequently. Usually, their occurrence hints a logic error (bug) in your program — a correctly written application should know which resources it loads and is able to access.</p>
+<h2>Ownership models</h2>
+<p> The <code>ResourceHolder</code> facility aims to be reusable in a variety of different scenarios. The pattern, where resources are stored centrally and accessed by many clients through references, will be referred to as <em>centralized ownership model</em> (accessible through <code>thor::Resources::CentralOwner</code>). It is very simple and very efficient.  The lifetime of resources is tied to that of their owning resource holder. Once the latter is destroyed, resources suffer the same fate. Even with this simple model, it is possible to build fairly complex scenarios by using multiple <code>ResourceHolder</code> instances with different scopes. Imagine a game that has several levels: there are resources that need to be available more or less all the time, such as textures or sounds needed to represent the player and his actions. Others are specific to a level and can be loaded once a level is entered and unloaded when it is left. A level class could simply keep a<code> ResourceHolder</code> as a member and load the resources in its constructor, and RAII would take care of releasing them automatically in the level's destructor.</p>
+<p>Now imagine a different scenario: you are writing a GUI framework with loads of different graphical themes and fonts. If two buttons use the same font,  you don't want that font to be loaded twice. And of course, you don't want to load a font if it is never used in any button. Similarly, to keep resource allocation low, you would like to release fonts as soon as they are no longer used by any button. In short: keep every resource around only once and exactly as long as it's used. To implement this manually, you would have to track resources, count how often they are referenced, and check the reference counter every time a button is destroyed.</p>
+<p>Thor does all this for you. It addresses the above-mentioned scenario by providing a new ownership model, the <em>reference-counted ownership</em> (<code>thor::Resources::RefCounted</code>). What this means is that<code> ResourceHolder</code>is now merely a manager, but no longer the owner of resources. Instead, the clients share ownership among each other. In this model, resources are no longer handed out as references (<code>R&amp;</code>), but as shared pointers (<code>std::shared_ptr&lt;R&gt;</code> objects), which fit this scenario perfectly.</p>
+<p> A third template parameter is used to enable this ownership model:</p>
+<pre>
+<span class="code-keyword">namespace</span> res = thor::Resources;<br />thor::ResourceHolder&lt;sf::Font, std::string, res::RefCounted&gt; holder;<span class="code-comment"></span></pre>
+<p>Now, we can work with the resource holder as usual, just that we deal with shared pointers instead of references. Keep in mind that you <strong>must</strong> store a shared pointer directly at the <code>acquire()</code> call — because by definition, the resource is only kept alive as long as it is used, and if it is not used directly after loading, then it will be released immediately. The following example shows three users of the font, all of which refer to the same resource.</p>
+<pre>std::shared_ptr&lt;sf::Font&gt; user1 = holder.acquire(<span class="code-string">&quot;Fancy&quot;</span>, res::fromFile&lt;sf::Font&gt;(<span class="code-string">&quot;MyFancyFont.ttf&quot;</span>));
+std::shared_ptr&lt;sf::Font&gt; user2 = user1;            <span class="code-comment">// Share from existing pointer</span>
+std::shared_ptr&lt;sf::Font&gt; user3 = holder[<span class="code-string">&quot;Fancy&quot;</span>]; <span class="code-comment"> // Access directly through ResourceHolder</span></pre>
+<p>Now each <code>std::shared_ptr</code> instance can be stored in a <code>Button</code> class. This keeps the font alive, as long as at least one button refers to it. When all buttons are destroyed, so is the shared font. Note that with reference-counted ownership, <code>ResourceHolder::release()</code>does not really release the resource. It only removes it from the resource holder, so that the ID can be reused. There is usually no reason to call <code>release()</code>here, as the shared pointers take care of releasing the resource automatically.</p>
+<h2>Customizing resource loading</h2>
+<p> By default, attempts to assign a resource ID more than once are prevented. That is, when you call <code>ResourceHolder::acquire()</code> with an ID that you have used in the same resource holder before (i.e. the ID is <em>known</em>), you'll have to fight with <code>ResourceAccessException</code>s. This behavior is embodied as <code>AssumeNew</code>, because it assumes every resource being loaded is  new. <code>AssumeNew</code> is one of several enumerators in an enum <code>thor::Resources::KnownIdStrategy</code>.</p>
+<p>Now imagine the case where you want to load a resource, and when the requested resource has already been loaded,  you just want that resource back. You don't care whether the ID has already been assigned to <em>the same</em> resource before. This is possible by using the <code>Reuse</code> strategy, which is particularly useful if you want to keep loading from different places symmetric. In the previous example with the buttons and fonts, you typically don't know which button is the first to request the resource, and you don't particularly care either. </p>
+To enable the reusing of existing fonts, pass <code>thor::Resources::Reuse</code> as a third argument to <code>acquire()</code>. In the following example, the second call recognizes that a font with ID &ldquo;Fancy&rdquo; has been requested before, and just returns that one instead of loading it again. The result is exactly the same as if you copied the <code>shared_ptr</code> or accessed the resource through <code>ResourceHolder::operator[]</code>.
+<pre>std::shared_ptr&lt;sf::Font&gt; user1 = holder.acquire(<span class="code-string">&quot;Fancy&quot;</span>, res::fromFile&lt;sf::Font&gt;(<span class="code-string">&quot;MyFancyFont.ttf&quot;</span>), res::Reuse);
+std::shared_ptr&lt;sf::Font&gt; user2 = holder.acquire(<span class="code-string">&quot;Fancy&quot;</span>, res::fromFile&lt;sf::Font&gt;(<span class="code-string">&quot;MyFancyFont.ttf&quot;</span>), res::Reuse);     <span class="code-comment"></span></pre>
+<p>There are other cases, where you simply want to assign an ID to a new resource, possibly overwriting previous  assignments. The<code> thor::Resources::Reload</code> strategy can be used to enforce a loading of the resource, even if the ID is already there.</p>
+<h2>Const correctness  [advanced]</h2>
+<p>It is often  desirable that resources are not altered after they have been initialized.  <code>ResourceHolder</code> propagates its const-qualification: a const-qualified holder only returns handles (references or shared pointers), through which the resource cannot be modified.</p>
+<pre>      ResourceHolder&lt;R, ...&gt;  holder;
+<span class="code-keyword">const</span> ResourceHolder&lt;R, ...&gt;&amp; cref = holder;
+
+      R&amp; a = holder[<span class="code-string">&quot;myID&quot;</span>]; <span class="code-comment"> // ok</span>
+<span class="code-keyword">const</span> R&amp; b = holder[<span class="code-string">&quot;myID&quot;</span>]; <span class="code-comment"> // ok</span>
+      R&amp; c = cref[<span class="code-string">&quot;myID&quot;</span>]; <span class="code-comment">   // forbidden (would remove const)
+</span><span class="code-keyword">const</span> R&amp; d = cref[<span class="code-string">&quot;myID&quot;</span>]; <span class="code-comment">   // ok</span></pre>
+
+<p>Thus, it is recommended that clients, who access resources only to use them passively, are given const-references to resource holders. Like this, you can ensure that resources are only loaded, unloaded and possibly changed in one central place.</p>
+<h2>Custom resources  [advanced]</h2>
+<p>Having your  own resource class, the following steps are required to make it compatible with Thor:</p>
+<ul>
+  <li>Your resource class shall support  RAII, but neither copyability nor default-constructibility is required.</li>
+  <li>You need to provide resource keys that are able to load the resource.</li>
+</ul>
+<p>A short example shows how to integrate an existing class called <code>Mesh</code> to Thor. First, let's see what's given by the external mesh API:</p>
+<pre><span class="code-comment">// Custom resource class
+</span><span class="code-keyword">class</span> Mesh {};
+
+<span class="code-comment">// Factory function returning a pointer to the resource
+</span>Mesh* createMesh(<span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename);</pre>
+
+<p>On user side, we now implement a functor that is able to load such a mesh. Thor requires this functor to return a <code>std::unique_ptr</code> to the resource, which shall be <code>nullptr</code> in case of loading failure.</p>
+<pre><span class="code-comment">// Functor to load mesh
+</span><span class="code-keyword">struct</span> MeshLoader
+{
+&nbsp;&nbsp;&nbsp;&nbsp; MeshLoader(<span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename)
+&nbsp;&nbsp;&nbsp;&nbsp; : filename(filename)
+&nbsp;&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp;&nbsp; }
+
+&nbsp;&nbsp;&nbsp;&nbsp; std::unique_ptr&lt;Mesh&gt; <span class="code-keyword">operator</span>() () <span class="code-keyword">const</span>
+&nbsp;&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">return</span> std::unique_ptr&lt;Mesh&gt;(createMesh(filename));
+&nbsp;&nbsp;&nbsp;&nbsp; }
+
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename;
+};</pre> 
+<p>Now we are able to create a Thor resource loader from the loading functor and a string ID which is unique for the same resource (here the filename): </p>
+<pre>thor::ResourceLoader&lt;Mesh&gt; loadMesh(<span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename)
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">return</span> thor::ResourceLoader&lt;Mesh&gt;(MeshLoader(filename), filename);
+}</pre>
+<p>Afterwards, we can directly use <code>Mesh</code> with Thor:</p>
+<pre><span class="code-keyword"></span>
+<span class="code-keyword">int</span> main()
+{
+&nbsp;&nbsp;&nbsp;&nbsp; thor::ResourceHolder&lt;Mesh, std::string&gt; holder;
+&nbsp;&nbsp;&nbsp;&nbsp; holder.acquire(<span class="code-string">&quot;myID&quot;</span>, loadMesh(<span class="code-string">"mesh.obj"</span>));
+}</pre>
+
+<p>Note that if we use lambda expressions, we don't need the functor, so the code to integrate the <code>Mesh</code> class is very short:</p>
+<pre>thor::ResourceLoader&lt;Mesh&gt; loadMesh(<span class="code-keyword">const</span> <span class="code-keyword">char</span>* filename)
+{
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-keyword">return</span> thor::ResourceLoader&lt;Mesh&gt;(
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; [=] () { <span class="code-keyword">return</span> std::unique_ptr&lt;Mesh&gt;(createMesh(filename)); },
+&nbsp;&nbsp;&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; filename);
+}</pre>
+
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

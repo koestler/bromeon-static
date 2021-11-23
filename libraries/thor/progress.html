@@ -1,0 +1,117 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Progress</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../index.html">Home</a></p>
+  <p><a href="../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="documentation/index.html">Documentation</a></p>
+      <p><a href="download/index.html">Download</a></p>
+      <p><a href="tutorials/index.html">Tutorials</a></p>
+      <div class="sb-cur">
+        <p><a href="progress.html">Progress</a></p>
+      </div>
+    </div>
+    <p><a href="../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../games/index.html">Games</a></p>
+  <p><a href="../../articles/index.html">Articles</a></p>
+  <p><a href="../../book/index.html">Book</a></p>
+  <p><a href="../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+<h1>Progress</h1>
+<p>To get a rough impression about the development progress, this site shows you what is planned for Thor 2, and what has already been implemented. Only API-related features are listed.</p>
+<h2>General, Config</h2>
+<ul>
+  <li><span class="green">[done] </span>Port code to C++11</li>
+  <li><span class="green">[done] </span>Adapt SFML's naming convention</li>
+  <li><span class="green">[done] </span>Get rid of <code>THOR_STATIC</code></li>
+  <li><span class="green">[done] </span>Supply FindSFML.cmake in own repository</li>
+  <li><span class="green">[done] </span> Add CMake option to build doc</li>
+  <li><span class="green">[done]</span> Restructure headers</li>
+  <li><span class="green">[done]</span> Reflect about ownership (particularly <code>shared_ptr</code> use cases)</li>
+</ul>
+<h2>Particles</h2>
+<ul>
+  <li><span class="green">[done]</span> Use <code>sf::VertexArray</code> instead of OpenGL</li>
+  <li><span class="green">[done]</span> Redesign emitters, add<code>UniversalEmitter</code></li>
+  <li><span class="green">[done]</span> Inherit <code>ParticleSystem</code> from <code>sf::Drawable</code></li>
+  <li><span class="green">[done]</span> Write affector type that applies animations, transform some affectors to animations</li>
+  <li><span class="green">[done]</span> Find an emitter/affector API that is more similar to animations</li>
+  <li><span class="green">[done]</span> Consider multiple textures in one particle system</li>
+  <li><span class="blue">[2.1]</span> Add user-data to <code>Particle</code></li>
+</ul>
+<h2>Resources</h2>
+<ul>
+  <li><span class="green">[done]</span> New resource key API</li>
+  <li><span class="green">[done]</span> Renamed <code>ResourceManager</code> to <code>ResourceCache</code>, require 1 template parameter</li>
+  <li><span class="green">[done]</span> Replace <code>ResourcePtr</code> with <code>std::shared_ptr</code></li>
+  <li><span class="green">[done]</span> Add combined resource cache: <code>MultiResourceCache</code></li>
+  <li><span class="green">[done]</span> Add lightweight and simple alternative to resource cache with shared pointers</li>
+</ul>
+<h2>Math</h2>
+<ul>
+  <li><span class="green">[done] </span>Add <code>Distribution</code> and predefined functions</li>
+  <li><span class="green">[done] </span>Evaluate alternatives to <code>Vertex</code> inheritance approach</li>
+  <li><span class="grey">[ceased]</span> Rename triangulation types (<code>Vertex</code> etc.) or move them to separate namespace</li>
+</ul>
+<h2>Animation</h2>
+<ul>
+  <li><span class="green">[done]</span> Make <code>Animator</code> more flexible</li>
+  <li><span class="green">[done]</span> Replace <code>Animation</code> class hierarchy with functors</li>
+  <li><span class="blue">[2.1]</span> Split <code>Animator</code> into animation-storing and animating classes</li>
+  <li><span class="blue">[2.1]</span> Add possibility to queue animations</li>
+  <li><span class="blue">[2.1]</span> Write more predefined animation types</li>
+</ul>
+<h2>Input</h2>
+<ul>
+  <li><span class="green">[done]</span> Rename <code>Action::ActionType</code> enumerators</li>
+  <li><span class="green">[done]</span> Add <code>operator!</code></li>
+  <li><span class="green">[done]</span> Rename module Events to Input<code></code></li>
+  <li><span class="green">[done]</span> Question usefulness of <code>EventSystem</code></li>
+  <li><span class="green">[done]</span> Integrate joystick axis  directly with <code>Action</code></li>
+  <li><span class="green">[done]</span> Consider integration of custom actions<code></code></li>
+  <li><span class="blue">[2.1]</span> Add support for double clicks<code></code>and stateful mouse wheel</li>
+</ul>
+<h2>Graphics</h2>
+<ul>
+  <li><span class="green">[done] </span>Split functionality from Multimedia</li>
+  <li><span class="green">[done]</span> Write setters/getters for generalized access of attributes like alpha value</li>
+  <li><span class="green">[done]</span> Check if <code>ColorGradient</code>is more flexible with other computation</li>
+  <li><span class="blue">[2.2]</span> Let <code>BigSprite</code> directly reference <code>sf::Texture</code></li>
+  <li><span class="blue">[2.2]</span> Add more functionality to <code>BigSprite</code>, like <code>setTextureRect()</code></li>
+  </ul>
+<h2>Shapes</h2>
+<ul>
+  <li><span class="green">[done] </span>Split functionality from Multimedia</li>
+  <li><span class="green">[done]</span> Remove some specific shape functions, maybe provide them as examples</li>
+  <li><span class="blue">[2.1]</span> Allow texturing of <code>ConcaveShape</code></li>
+</ul>
+<h2>Time</h2>
+<ul>
+  <li><span class="green">[done]</span> See if more specific functions like <code>restart()</code> are appropriate</li>
+  <li><span class="blue">[2.1]</span> Consider facilities for frame management</li>
+</ul>
+<h2>Other</h2>
+<ul>
+  <li><span class="blue">[2.1]</span> Implement Audio players</li>
+</ul>
+</div>
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

@@ -1,0 +1,161 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Particles Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Particles Tutorial  </h1>
+  <p>Welcome to  the Particles tutorial. It will teach you how to use the particle system in the  Thor Library. Fundamentally, there are multiple entities which lead in  combination to the rendering of particles on the screen:</p>
+  <ul>
+    <li>The  actual particle system, which stores and renders the particles</li>
+    <li>Particle  affectors which influence particles during their lifetime</li>
+    <li>Particle  emitters that create new particles and provide them with initial conditions</li>
+  </ul>
+  <h2>The <code>ParticleSystem</code> class</h2>
+  <p>This class  is the core of Thor’s Particles module. It holds containers of particles and  provides an interface to update and draw them. Every <code>ParticleSystem</code> instance is  initialized with a <code>const sf::Texture&amp;</code> representing the particle’s texture. Inside a single system, all particles use the same texture. Let’s define a particle system  that uses a given texture for the particles:</p>
+<pre>sf::Texture texture;
+… <span class="code-comment">// Load texture
+</span>thor::ParticleSystem system;
+system.setTexture(texture);</pre>
+
+<p>Important  are two member functions. First, a method called <code>update()</code> applies 2D transforms to each particle. It emits new particles and affects  existing ones, depending on the passed time. The parameter <code>dt</code> stands for the  frame time, which can be computed with a <code>sf::Clock </code>instance.  The other important method is <code>draw()</code> which renders the particles on your  screen, using the current <code>sf::View</code>.</p>
+<p>An example of how the particle system integrates to your game loop:
+<pre>sf::RenderWindow window(...);
+sf::Clock clock;
+thor::ParticleSystem system;
+... <span class="code-comment">// Initialize particle system</span>
+
+<span class="code-comment">// Main loop
+</span><span class="code-keyword">for</span> (;;)
+{
+&nbsp;&nbsp;&nbsp;&nbsp; ... <span class="code-comment">// Handle events etc.
+</span>
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// Update particle system
+</span>&nbsp;&nbsp;&nbsp;&nbsp; system.update(clock.restart());
+
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// Draw particle system
+</span>&nbsp;&nbsp;&nbsp;&nbsp; window.clear();
+&nbsp;&nbsp;&nbsp;&nbsp; window.draw(system);
+&nbsp;&nbsp;&nbsp;&nbsp; window.display();
+}</pre>
+
+<h2>Emitters</h2>
+<p>Before a  particle system is able to manipulate and draw any particles, the latter must  be created somehow. This is the task of the particle <em>emitters</em>. Emitters are represented by function objects; that is, you can use functors, global and member functions, results of <code>std::bind()</code>, and lambda expressions.</p>
+<p>There is one concrete emitter type in Thor, namely <code>thor::UniversalEmitter</code>. This class can determine parameters like emission rate as well as initial particle conditions such as position, rotation or lifetime. However, <code>UniversalEmitter</code> itself has no geometric representation in 2D space.</p>
+<p>An  emitter object can be attached to a particle system using <code>thor::ParticleSystem::addEmitter()</code>. By doing so, you tell the <code>ParticleSystem</code> that it may use your emitter as a source of particles for the system. As soon  as the particles are emitted, the <code>ParticleSystem</code> object takes control of them  and manages them. For  example, we define an emitter that creates particles inside a circular area,  and attach it to the particle system:</p>
+<pre><span class="code-comment">// Create emitter that emits 30 particles per second, each of which lives for 5 seconds
+</span>thor::UniversalEmitter emitter;
+emitter.setEmissionRate(30);
+emitter.setParticleLifetime(sf::seconds(5));
+system.addEmitter(emitter);</pre>
+
+<p>Now the particles are automatically emitted. But sometimes these constants aren't enough, what if you want the lifetime to be in a random interval, e.g. between 5 and 7 seconds? For this purpose, Thor's Math module implements <em>distributions</em>. These consist of functions that return a value based on a specific distribution (like a uniform random number in an interval, or a point in a rectangle). </p>
+<p>To implement the given example of a random time in [5, 7] seconds, we can write this:</p>
+<pre>
+emitter.setParticleLifetime( thor::Distributions::uniform(sf::seconds(5), sf::seconds(7)) );</pre>
+<p>The same applies to other attributes, for example:</p>
+<pre>
+emitter.setParticlePosition( thor::Distributions::circle(center, radius) ); <span class="code-comment">  // Emit particles in given circle</span>
+emitter.setParticleVelocity( thor::Distributions::deflect(direction, 15.f) ); <span class="code-comment">// Emit towards direction with deviation of 15°</span>
+emitter.setParticleRotation( thor::Distributions::uniform(0.f, 360.f) ); <span class="code-comment">     // Rotate randomly</span></pre>
+<h2>Affectors</h2>
+<p>Things get  interesting when you want to influence particles after their emission. For this  purpose, the Thor library supplies you with particle <em>affectors</em>.   There are predefined classes specifying different affector mechanisms. Examples include the force  affector, which constantly accelerates particles, or the color affector, which applies a color gradient to particles over time.</p>
+<p> Like emitters, affectors are represented by function objects and can be attached to a  <code>ParticleSystem</code>. In every frame, the particle system invokes each of the attached  affectors and lets it modify the particles. A simple example of an affector  that applies gravity to all particles is defined as follows:</p>
+<pre>
+sf::Vector2f acceleration(0.f, 10.f);
+thor::ForceAffector gravityAffector(acceleration);
+system.addAffector(gravityAffector);</pre>
+<p> Affectors are tightly related to animations. While the former are functions that modify particles over time, the latter are functions that modify general graphical objects such as sprites for a given process. Let's say we have an animation <code>fader</code> that fades the particle in and out during the first and last 15% of its lifetime:</p>
+<pre>
+thor::FadeAnimation fader(0.15f, 0.15f);</pre>
+<p> It is now possible to use this animation  as an affector, through the wrapper class <code>thor::AnimationAffector</code>:</p>
+<pre>system.addAffector(thor::AnimationAffector(fader));</pre>
+<h2>Multiple particle variants</h2>
+<p>If you do not want to use the whole texture, it is possible to specify one or more texture rectangles that are used to represent a particle. Multiple texture rects are useful if you want different variants of a  particle, but only a single particle system. For example, let's say you use <code>thor::ParticleSystem</code> to represent debris. Of course, interesting chunks of debris have distinct shapes, so you might use multiple texture rectangles to refer to  the different variants.</p>
+<p>Adding new texture rects is straightforward:</p>
+<pre>
+thor::ParticleSystem system;
+system.setTexture(texture);
+system.addTextureRect(sf::IntRect(...));
+system.addTextureRect(sf::IntRect(...));</pre>
+<p>But how do you choose which texture rect a specific particle uses? The <code>addTextureRect()</code> function returns a  texture index, which can be passed to an emitter. In the following example, all emitted particles are assigned <code>index1</code> and therefore use the texture rectangle <code>rect1</code>:</p>
+<pre>
+unsigned int index0 = system.addTextureRect(rect0);
+unsigned int index1 = system.addTextureRect(rect1);
+
+thor::UniversalEmitter emitter;
+emitter.setParticleTextureIndex(index1);</pre>
+<p>Texture indices are consecutive <code>unsigned int</code> numbers starting at zero. That allows you to easily choose an index at random. If you call <code>addTextureRect()</code> three times, the indices will be 0, 1 and 2. Thus, you can use the Math module to create a random distribution that is directly usable:</p>
+<pre>
+emitter.setParticleTextureIndex(thor::Distributions::uniform(0, 2));</pre>
+<h2>Value and reference semantics</h2>
+<p>Because affectors and emitters are function objects, they have value semantics, meaning that they can be copied, assigned, passed to functions and returned from functions the way you are used to. Therefore, when you attach an affector or emitter to a particle system, it will be copied. This makes it possible to use temporary objects without worrying about lifetimes.</p>
+<p>However, sometimes this is not what you want. You might want to store an emitter elsewhere and change it after you have added it to the particle system. For example, a lot of emitters are directed, depending on the orientation of game objects. In order to have reference semantics – meaning that emitters and affectors are only referenced   and not owned  by the particle system – Thor provides two functions <code>thor::refAffector()</code> and <code>thor::refEmitter()</code> that can enclose affectors and emitters:</p>
+<pre><span class="code-comment">// Create emitter</span>
+thor::UniversalEmitter emitter;
+
+<span class="code-comment">// Add reference to emitter to particle system</span>
+system.addEmitter(thor::refEmitter(emitter));
+
+<span class="code-comment">// Change emitter properties later</span>
+emitter.setEmissionRate(30);
+emitter.setParticleLifetime(sf::seconds(5));</pre>
+<p>Of course, it is now your responsibility to keep the referenced objects alive as long as they are used by the particle system.</p>
+<h2>Removing affectors and emitters</h2>
+<p>Sometimes you may want to add emitters and affectors only temporarily. A typical example is an explosion, where an emitter emits particles for a very short time. A simple option to limit the time during which emitters or affectors remain active is to use the corresponding overloads:</p>
+<pre><span class="code-comment">// Add only for 1 second</span>
+system.addEmitter(emitter, sf::seconds(1));
+system.addAffector(affector, sf::seconds(1));</pre>
+<p>Sometimes you need more control however, often you want to couple the removal to a condition. The <code>addEmitter()</code> and <code>addAffector()</code> functions return a <code>thor::Connection</code> instance, which has a method <code>disconnect()</code>. Simply call it, and the corresponding emitter or affector will be removed from the system.</p>
+<pre>thor::Connection c = system.addEmitter(emitter);
+c.disconnect();</pre>
+<p>It is even possible to couple the emitter to the lifetime of another object. The RAII-style class <code>thor::ScopedConnection</code> automatically disconnects the associated object<code></code> upon destruction.</p>
+<pre>
+{
+    thor::ScopedConnection c = system.addEmitter(emitter);
+} <span class="code-comment">// End of scope: Emitter is removed</span></pre>
+<p>To demonstrate a use case, let's assume you have a central particle system to emit the exhaust of multiple airplanes. You  add an emitter for every airplane, while the planes themselves store a scoped connection to the corresponding emitter. If an airplane is destroyed, its emitter will automatically be removed.</p>
+<h2>Customization [advanced]</h2>
+<p>You can easily provide your own emitter or affector by implementing functions for them. Both emitters and affectors are represented by callable objects, that is, you  have to conform to the following signatures:</p>
+<pre>void (thor::EmissionInterface&amp; system, sf::Time dt)<span class="code-comment">  // emitter</span>
+void (thor::Particle& particle, sf::Time dt)<span class="code-comment">     // affector</span></pre>
+<p><code>thor::EmissionInterface</code> is a tiny class that acts as an interface to the particle system. It provides solely an <code>emitParticle()</code> function that allows you to insert a particle. For affectors, the particle being affected is passed to your affector function. The <code>thor::Particle</code> class stores various particle attributes, such as position, lifetime, color and texture index. For both emitters and affectors, the parameter<code>dt</code> represents the delta frame time.</p>
+<p>The Fireworks example of the SDK shows you how to implement custom affectors and emitters. The result may look as follows:</p>
+<img src="thor-fireworks.png" />
+<p><br />
+</p>
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

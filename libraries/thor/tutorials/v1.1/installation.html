@@ -1,0 +1,78 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Installation Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Installation Tutorial</h1>
+  <p>In this tutorial, I try to teach you how to  install Thor with the CMake build system and how to use it in your projects.</p>
+  <h2>Compiling SFML</h2>
+  <p>Before you are able to build Thor, SFML must be compiled. Make sure that you use a recent Git revision that is compatible with Thor, a Git snapshot is provided on the download site. Use CMake to build and install SFML, there is a <a href="http://www.sfml-dev.org/tutorials/2.0/compile-with-cmake.php">tutorial</a> on the official SFML page. This should also copy the FindSFML.cmake module into the CMake modules folder, which is required to find SFML.</p>
+  <p>Build the SFML configurations you like to use, and create  static or dynamic libraries of the components system, window, graphics and audio.</p>
+  <p><span class="important">Important:</span> Do not only compile SFML, but also <em>install</em> it. For Visual Studio solutions, build the INSTALL project. Using (N)Make, execute <code>make install</code> or <code>nmake install</code> in the command line, respectively.</p>
+  <h2>Configuring CMake</h2>
+  <p>I guess you already know CMake since SFML uses it, but I  show you some steps specific to this library.</p>
+<p>After downloading the SDK from the download site or from the SVN repository, run CMake. Here, I will explain how to work with the graphical user interface (cmake-gui). Specify the source and build directory, click &quot;Configure&quot; and choose your generator. After configuring, this might happen:</p>
+<img src="cmake1.png" />
+<p>There occurs an error because Thor needs SFML and doesn't know where it is. Just set the SFMLDIR variable to the directory path of SFML (the folder containing  &quot;include&quot; and &quot;lib&quot;). Additionally, there are several options to customize:</p>
+<ul>
+  <li><strong>CMAKE_BUILD_TYPE</strong> – Either &quot;Release&quot; or &quot;Debug&quot;</li>
+  <li><strong>CMAKE_INSTALL_PREFIX</strong> – The directory which should contain the compiled libraries, include directories and maybe examples</li>
+  <li><strong>THOR_BUILD_EXAMPLES</strong> – Check the box if the example codes should be compiled</li>
+  <li><strong>THOR_SHARED_LIBS</strong> – Enable to build shared/dynamic libraries, disable to build static libraries</li>
+  <li><strong>THOR_STATIC_STD_LIBS</strong> – Enable to link compiler-specific CRT  and standard libraries statically (usually not recommended)</li>
+</ul>
+<p> Press &quot;Configure&quot;.  Your CMake window looks similar to the following image:</p>
+<p><img src="cmake2.png" /></p>
+<p>Click &quot;Generate&quot;, go to the build directory and build the project.</p>
+<h2>Linking  Thor</h2>
+<p>As soon as your libraries are built, you can use Thor in your projects. The generated libraries have the following naming scheme:</p>
+<table>
+  <tr>
+    <td width="250"><strong>Dynamic Linkage, Release</strong></td>		
+    <td>thor</td></tr>
+  <tr>
+    <td><strong>Dynamic Linkage, Debug</strong></td>	<td>thor-d</td></tr>
+  <tr>
+    <td><strong>Static Linkage, Release</strong></td>		<td>thor-s</td></tr>
+  <tr>
+    <td><strong>Static Linkage, Debug</strong></td>		<td>thor-s-d</td></tr>
+</tr>
+</table>
+<p>If necessary, add the library prefixes ("lib") and file extensions (".lib", ".dll", ".so") corresponding to your platform and compiler.</p>
+<p>When you link statically, you have to  add <strong>THOR_STATIC</strong> to your project's preprocessor definitions.</p>
+</div>
+
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

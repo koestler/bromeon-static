@@ -1,0 +1,92 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Aurora</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../index.html">Home</a></p>
+  <p><a href="../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../thor/index.html">Thor</a></p>
+    <div class="sb-cur">
+      <p><a href="../aurora/index.html">Aurora</a></p>
+    </div>
+    <div class="sb-sub2">
+      <p><a href="documentation/index.html">Documentation</a></p>
+      <p><a href="download/index.html">Download</a></p>
+      <p><a href="tutorials/index.html">Tutorials</a></p>
+    </div>
+  </div>
+  <p><a href="../../games/index.html">Games</a></p>
+  <p><a href="../../articles/index.html">Articles</a></p>
+  <p><a href="../../book/index.html">Book</a></p>
+  <p><a href="../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+<h1>Aurora C++ Library</h1>
+<p>Aurora is a small library that contains various useful C++ functionality. It  is header-only, so it can be used very easily in any project.</p>
+<p>The library doesn't focus on a specific application field such as Thor; it doesn't depend on SFML either. Instead, Aurora intends to make general programming techniques easier and to bring rather unknown idioms to the C++ community. Aurora is used in the implementation and interface of the Thor library.</p>
+<h2>Features</h2>
+<p>The library is split into the following modules:</p>
+<ul>
+  <li><strong>SmartPtr:</strong> Smart pointers with deep copy  semantics, customizable cloners and deleters</li>
+  <li><strong>Tools:</strong> Various utility, like safe bool idiom, noncopyable base class, named tuples...</li>
+  <li><strong>Dispatch:</strong> Multimethods (as extension of virtual functions), non-intrusive dispatching on functions with 1 or 2 arguments</li>
+  <li><strong>Meta:</strong> Template and preprocessor metaprogramming (mainly used by other modules)</li>
+</ul>
+<h2>Philosophy</h2>
+<p>The idea of Aurora is not to cover all the typical daily C++ problems. That's the reason why you will find a lot of functionality that seems unusual, sometimes innovative, and possibly confusing at first. Yet, there are still places where the standard library and Boost do not provide the functionality you need to solve a specific problem, or they only provide it in an overly complicated (Boost developers would say &quot;generic&quot;) way.</p>
+<p>The core philosophy behind the library can be summarized as follows:</p>
+<ul>
+  <li><strong>Lightweight and modular:</strong> Unlike other libraries with similar application field such as Boost, the dependencies are tiny. When you use one feature, you use that specific feature, and it does not pull hundreds of files behind it. Compile times are short (and they're caused mainly by included standard headers).</li>
+  <li><strong>Simple:</strong> The use cases are sometimes  complex, and even more so is Aurora's implementation. The focus lies on providing a simple and intuitive API that abstracts from this complexity and that lets you use features without caring about the internals.</li>
+  <li><strong>Zero installation:</strong> Aurora is a header-only library. All you need is to download it and put it in your include path -- done. No configuration, build or link steps are required.</li>
+  <li><strong>Unconventional:</strong> A lot of things in Aurora can't be found elsewhere, and you may encounter new C++ techniques as you use the library. Aurora attempts to fill several gaps in language-level libraries, and it does not stop short of exploiting the borders of the C++ language in order to achieve this goal.</li>
+  <li><strong>Genericity vs. overengineering:</strong>  Aurora makes very few assumptions about your  code. The use of templates makes it possible to integrate your own types directly. On the other hand, overly generic solutions to solve non-problems are avoided. You won't encounter class templates with dozens of policies, or non-documented concepts that your types have to fulfill.</li>
+</ul>
+<h2>Examples</h2>
+<p>Let's get concrete, what does Aurora offer? The following code snippets are not complete, but they should give you a basic idea of what this library provides, and whether it might be something for you.</p>
+<p><strong>Smart pointers:</strong> The copyable smart pointer is able to perform deep copies across polymorphic class hierarchies. This allows you to treat pointers to derived objects with value semantics, which simplifies code dramatically (e.g. copy constructor and assignment operator can often be omitted).</p>
+<pre>
+<span class="code-keyword">struct</span> Base { <span class="code-keyword">virtual</span> ~Base(); };
+<span class="code-keyword">struct</span> Derived : Base {};
+
+aurora::CopiedPtr&lt;Base&gt; p(<span class="code-keyword">new</span> Derived);
+aurora::CopiedPtr&lt;Base&gt; q = p; <span class="code-comment">// *q is now a copy of *p</span></pre>
+<p><strong>Dynamic dispatchers:</strong> Overloading at runtime. From a set of possible functions, choose the correct one depending on the arguments.</p>
+<pre><span class="code-keyword">struct</span> Object { <span class="code-keyword">virtual</span> ~Object() {} };<br /><span class="code-keyword">struct </span>Asteroid : Object {};<br /><span class="code-keyword">struct</span> Ship : Object {};
+
+<span class="code-keyword">void</span> collisionAA(Asteroid*, Asteroid*) { std::cout &lt;&lt; <span class="code-string">&quot;Asteroid-Asteroid\n&quot;</span>; }<br /><span class="code-keyword">void </span>collisionAS(Asteroid*, Ship*)     { std::cout &lt;&lt; <span class="code-string">&quot;Asteroid-Ship\n&quot;</span>;     }<br /><span class="code-keyword">void</span> collisionSS(Ship*,     Ship*)     { std::cout &lt;&lt; <span class="code-string">&quot;Ship-Ship\n&quot;</span>;         }
+
+<span class="code-comment">// Register &quot;overloaded&quot; functions</span>
+<span class="code-keyword">using</span> aurora::Type;
+aurora::DoubleDispatcher&lt;void(Object*,Object*)&gt; disp;<br />disp.bind(Type&lt;Asteroid&gt;(), Type&lt;Asteroid&gt;(), &amp;collisionAA);<br />disp.bind(Type&lt;Asteroid&gt;(), Type&lt;Ship&gt;(),     &amp;collisionAS);<br />disp.bind(Type&lt;Ship&gt;(),     Type&lt;Ship&gt;(),     &amp;collisionSS);
+<span class="code-comment">
+</span><span class="code-comment">// Call function, given only base class pointers
+</span>Asteroid a;   Object* pa = &amp;a;<br />Ship s;       Object* ps = &amp;s;<br />disp.call(pa, ps); <span class="code-comment">// Output: Asteroid-Ship</span></pre>
+<p><strong>Named tuples:</strong> Quickly define <code>std::tuple</code>-like types, but with expressive syntax (i.e. named member access) and a list of automatically generated &quot;extensions&quot; such as comparison operators or hash functions.</p>
+<pre>AURORA_NAMED_TUPLE_EXT(MyTuple,    <span class="code-comment">// define a type called MyTuple</span>
+((<span class="code-keyword">int</span>, myInt), (<span class="code-keyword">float</span>, myFloat)),  <span class="code-comment">// with members int myInt, float myFloat</span>
+(AURORA_NT_LESS))                  <span class="code-comment">// and automatically generated operator&lt;</span>
+
+MyTuple t(2, 3.5f);       <span class="code-comment">// construct MyTuple object</span>
+t.myInt = 3;<span class="code-comment">              // access members -- more readable than t.first or std::get&lt;0&gt;(t)</span>
+
+std::map&lt;MyTuple, X&gt; map; <span class="code-comment">// use as key in map (because of operator&lt;)</span>
+</pre>
+<h2>License </h2>
+<p>Like Thor, Aurora is licensed under  zlib/libpng. So you can use it for virtually everything.</p>
+</div>
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>

@@ -1,0 +1,193 @@
+﻿<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+<link href="../../../../layout.css" rel="stylesheet" type="text/css" />
+<title>Bromeon :: Thor :: Actions Tutorial</title>
+</head>
+
+<body>
+<!--# include file="menu.shtml" -->
+<div id="header"><img src="../../../../bromeon.png" alt="Bromeon"/>
+</div>
+<div class="sidebar">
+  <p><a href="../../../index.html">Home</a></p>
+  <p><a href="../../../../libraries/index.html">C++ Libraries</a></p>
+  <div class="sb-sub">
+    <p><a href="../../../thor/index.html">Thor</a></p>
+    <div class="sb-sub2">
+      <p><a href="../../documentation/index.html">Documentation</a></p>
+      <p><a href="../../download/index.html">Download</a></p>
+      <div class="sb-cur">
+        <p><a href="../../tutorials/index.html">Tutorials</a></p>
+      </div>
+      <p><a href="../../progress.html">Progress</a></p>
+    </div>
+    <p><a href="../../../aurora/index.html">Aurora</a></p>
+  </div>
+  <p><a href="../../../../games/index.html">Games</a></p>
+  <p><a href="../../../../articles/index.html">Articles</a></p>
+  <p><a href="../../../../book/index.html">Book</a></p>
+  <p><a href="../../../../contact.html">Contact</a></p>
+</div>
+
+<div id="content">
+  <h1>Actions Tutorial  </h1>
+  <p>Welcome to the tutorial about the Events module. Here, you will learn how to build up an object-oriented event system. From SFML, you know the procedural way of event handling, namely polling:</p>
+<pre>
+<span class="code-keyword">while</span> (window.PollEvent(event))
+{
+    <span class="code-comment">// switch on event type</span>
+}</pre>
+
+<p>However, this approach has a few drawbacks. You  have to differentiate the types explicitly, and your code reacting to the  events is gathered in one place. The single events are hardwired as compile-time constants after each case mark. That makes it complicated to change controls according to the user's request.</p>
+<p>The Action system of Thor's Events module has been designed with the following thoughts in mind:</p>
+<ul>
+  <li>Different actions are adressed by  IDs of arbitrary types (e.g. strings, enums)</li>
+  <li>Add, modify and remove actions at runtime to allow dynamic assignment of input events</li>
+  <li>Uniform treatment of one-time events (sf::Event) and realtime conditions (sf::Mouse, sf::Keyboard and sf::Joystick) </li>
+  <li>Possibility to link actions to a callback system</li>
+</ul>
+<h2>Actions</h2>
+<p>The class <code>thor::Action</code> represents an action. It can be used in the following situations:</p>
+<ul>
+  <li>Handle whole SFML event, such as <code>sf::Event::Closed</code> or <code>sf::Event::Resized</code></li>
+  <li>React to a  key, mouse button or joystick button event (pressed or released once)</li>
+  <li>React to realtime keyboard, mouse and joystick state (is the button currently held down?)</li>
+  </ul>
+<p>We say that an action is active if the event or input state specified in the constructor has been triggered. In the following example, we define some actions. The comments explain when each action is active.</p>
+<pre>thor::Action a(sf::Keyboard::X, thor::Action::PressOnce); <span class="code-comment">// Key X is pressed once
+</span>thor::Action b(sf::Mouse::Left, thor::Action::Realtime);  <span class="code-comment">// Left mouse button is currently held down
+</span>thor::Action c(sf::Event::Closed);                        <span class="code-comment">// SFML Window is closed</span></pre>
+We can even combine multiple actions! The following creates an action which is active when both <code>a</code> and <code>b</code> are active:
+<pre>thor::Action both = a && b;</pre>
+The same works if at least one of them must be active in order to activate the combined action:
+<pre>thor::Action atLeastOne = a || b;</pre>
+Of course, you can build arbitrary complex expressions using the overloaded AND and OR operators.
+<h2>Action maps</h2>
+<p>Now we have defined some actions, but how can we use them? Here, the class template <code>thor::ActionMap</code> comes into play.</p>
+<p>This class template maps IDs to actions. IDs can be of any comparable type, for example <code>std::string</code> or a user-defined enumeration. This type is specified in the template parameter. When we initialize an action map object, we have to pass the window that is used for event generation:</p>
+<pre>sf::Window window(...<span class="code-string"></span>);
+thor::ActionMap&lt;std::string&gt; map(window);
+</pre>
+<p>We have defined an action map that stores <code>std::string</code> identifiers associated with <code>thor::Action</code> instances. Now let's introduce meaningful IDs and associate them with the actions above:</p>
+<pre>map[<span class="code-string">"run"</span>] = a;
+map[<span class="code-string">"shoot"</span>] = b;
+map[<span class="code-string">"quit"</span>] = c;</pre>
+Now the action map knows our actions. We can check if an action is currently active by writing
+<pre><span class="code-keyword">if</span> (map.IsActive(<span class="code-string">"run"</span>))
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// React to "run" action
+</span><span class="code-keyword">if</span> (map.IsActive(<span class="code-string">"shoot"</span>))
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// React to "shoot" action
+</span><span class="code-keyword">if</span> (map.IsActive(<span class="code-string">"quit"</span>))
+&nbsp;&nbsp;&nbsp;&nbsp; <span class="code-comment">// React to "quit" action</span></pre>
+How does the action map know if an action is active? In order to make this possible, we need to feed it with the SFML events occurred every frame. This is automatically done if we call the <code>thor::ActionMap::Update()</code> method. Here is an example of a main loop:
+<pre><span class="code-keyword">while</span> (window.IsOpened())
+{
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// Poll the window for new events, update actions
+</span>&nbsp;&nbsp;&nbsp; map.Update();
+
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// React to different action types</span>
+&nbsp;&nbsp;&nbsp; <span class="code-keyword">if</span> (map.IsActive(<span class="code-string">&quot;quit&quot;</span>))
+    <span class="code-comment"></span>    window.Close();
+
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// Update window
+</span>&nbsp;&nbsp;&nbsp; window.Display();
+}</pre>
+<p>As an alternative to <code>Update()</code>, <code>thor::ActionMap</code> provides the methods <code>PushEvent()</code> to add an SFML event and <code>ClearEvents()</code> to remove old events. These methods exist for more flexibility, if you want to poll the window yourself and decide which events are forwarded to the action map. Using this approach, you can write the following code:</p>
+<pre><span class="code-keyword">while</span> (window.IsOpened())
+{
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// Clear events from last frame
+</span>&nbsp;&nbsp;&nbsp; map.ClearEvents();
+
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// Forward all events to the action map
+</span>&nbsp;&nbsp;&nbsp; sf::Event event;
+&nbsp;&nbsp;&nbsp; <span class="code-keyword">while</span> (window.PollEvent(event))
+&nbsp;&nbsp; &nbsp;&nbsp;&nbsp;&nbsp; map.PushEvent(event);
+
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// React to different action types</span>
+&nbsp;&nbsp;&nbsp; <span class="code-keyword">if</span> (map.IsActive(<span class="code-string">&quot;quit&quot;</span>))
+    <span class="code-comment"></span>    window.Close();
+
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// Update window
+</span>&nbsp;&nbsp;&nbsp; window.Display();
+}&nbsp;&nbsp;&nbsp;&nbsp; </pre>
+<h2>Connecting callbacks</h2>
+<p>Actions can act as triggers  for function invocations. Let&rsquo;s call the functions associated to  the different event types &ldquo;listeners&rdquo; (other terms are &ldquo;callbacks&rdquo;, &ldquo;slots&rdquo;, &ldquo;event handlers&rdquo; or &ldquo;observers&rdquo;).
+<p>What we  need now are the listeners that are invoked if an action is active. Listener functions return <code>void</code> and take a parameter of type <code>thor::ActionContext</code> with your ID type as template argument. This parameter contains information about the context in which an action was fired (for example the original <code>sf::Event</code> that triggered the action).
+<p>Define a listener for actions with the ID<code>&quot;shoot&quot;</code>:
+<pre><span class="code-keyword"></span><span class="code-keyword">void</span> OnShoot(thor::ActionContext&lt;MyAction&gt; context)
+{
+&nbsp;&nbsp;  <span class="code-comment">// context.Window is a pointer to the sf::Window passed to the thor::ActionMap constructor. It can
+</span>&nbsp;&nbsp;&nbsp; <span class="code-comment">// be used for mouse input relative to a window, as follows:
+</span>&nbsp;&nbsp;&nbsp; sf::Vector2i mousePosition = sf::Mouse::GetPosition(*context.Window);
+
+&nbsp;&nbsp;&nbsp; <span class="code-comment">// Do something with the mouse position...</span>
+}</pre>
+<p> Using the  class template <code>thor::EventSystem</code>, you can associate different action types with  different functions. <code>thor::ActionMap</code> contains a member typedef <code>CallbackSystem</code> for the correct type. Let's instantiate such a callback system and connect the ID <code>&quot;shoot&quot;</code>with the just defined callback 
+  <code>OnShoot()</code>:
+<pre>thor::ActionMap&lt;std::string&gt;::CallbackSystem system;
+system.Connect(<span class="code-string">"shoot"</span>, &amp;OnShoot);</pre>
+
+<p>The callback system is ready to call the correct functions if an action is triggered. We only need to forward the actions from <code>thor::ActionMap</code> to the <code>CallbackSystem</code>. We can do this in the main loop, instead of the <code>IsActive()</code> calls:
+<pre>map.InvokeCallbacks(system);</pre>
+
+<p>The callback mechanism is quite powerful. The second  parameter of <code>Connect()</code> can not only be a pointer to function like in the above example,  rather any compatible callable is allowed. That is, you can also pass function objects,  especially instances of <code>std::tr1::function</code>. Besides, you are able to connect any number  of listeners to one action type, just invoke <code>Connect()</code>once for each listener. </p>
+<p>Another example is a listener that moves a sprite when the player is running:</p>
+<pre><span class="code-keyword">void</span> MoveSprite(sf::Sprite&amp; sprite)
+{
+&nbsp;&nbsp;&nbsp; sprite.Move(10.f, 0.f);
+}</pre>
+
+<p>Here, we  can&rsquo;t register <code>MoveSprite()</code> directly at the event system, because the  parameter list doesn&rsquo;t match (<code>sf::Sprite&amp;</code> vs.<code>thor::ActionContext&lt;std::string&gt;</code>). But we  can build a function object:
+<pre>
+<span class="code-keyword">struct</span> SpriteMover
+{
+&nbsp;&nbsp;&nbsp; <span class="code-keyword">explicit</span> SpriteMover(sf::Sprite&amp; sprite)
+&nbsp;&nbsp;&nbsp; : sprite(sprite)
+&nbsp;&nbsp;&nbsp; {
+&nbsp;&nbsp;&nbsp; }
+
+&nbsp;&nbsp;&nbsp; <span class="code-keyword">void</span> <span class="code-keyword">operator</span>() (thor::ActionContext&lt;std::string&gt;)
+&nbsp;&nbsp;&nbsp; {
+<span class="code-comment">        // ignore parameter</span>
+&nbsp;&nbsp;&nbsp; &nbsp;&nbsp; &nbsp;sprite.Move(10.f, 0.f);
+&nbsp;&nbsp;&nbsp; }
+
+&nbsp;&nbsp;&nbsp; sf::Sprite&amp; sprite;
+};</pre>
+
+<p>Then the  registration looks like this:</p>
+<pre>
+sf::Sprite playerSprite;
+system.Connect(<span class="code-string">&quot;run&quot;</span>, SpriteMover(playerSprite));</pre>
+
+<h2>Binders [advanced]</h2>
+<p>This is a  chapter that requires rather advanced C++ knowledge, so depending on your  skills, you might want to skip it. You can use the whole functionality of the  event systems in Thor without binders, however they can simplify things a lot. 
+  <p>You may  think, the functor <code>SpriteMover</code> needs quite a lot code to achieve a single-line  functionality. You are right. Fortunately, C++ offers other ways, namely  binders. The library Boost.Bind (which has made it into TR1) contains a bunch  of tools to compose new functions on-the-fly. If you are unfamiliar to binders,  you should have a look at the Boost documentation – you don&rsquo;t need Boost though,  the TR1 is enough. First, we write a line to simplify the usage of the TR1  namespaces:
+  <pre><span class="code-keyword"></span>
+<span class="code-keyword">namespace</span> tr1 = std::tr1;
+</pre>
+
+  Using the global function <code>MoveSprite()</code> from above, the registration looks like the following.  You need <code>tr1::ref</code> to pass the sprite as reference.
+  <pre>sf::Sprite playerSprite;
+system.Connect(<span class="code-string">&quot;run&quot;</span>, tr1::bind(&amp;MoveSprite, tr1::ref(playerSprite)));</pre>
+
+<p>We got rid  of the class and all the constructor/member/initialization stuff. But honestly,  that annoying function does nothing more than forwarding a call to a member.  Since binders support member functions, why not use them to call  <code>sf::Sprite::Move()</code> directly?</p>
+<pre>
+sf::Sprite playerSprite;
+system.Connect(<span class="code-string">&quot;run&quot;</span>, tr1::bind(&amp;sf::Sprite::Move, &amp;playerSprite, 10.f, 0.f));</pre>
+
+<p>Now all the  functionality is contained in a single line, and we are relieved from writing  boilerplate code.</p>
+<h2>Disconnecting callbacks</h2>
+<p>With the function <code>thor::EventSystem::Connect()</code>, you have the possibility to add event-listener connections. But you don't know  how to remove them from the  system as soon as they aren&rsquo;t needed anymore. The member function <code>Connect()</code> returns an object of type <code>thor::Connection</code> which exists exactly for this  purpose. You can store it and call its method <code>Disconnect()</code> later to disconnect  the listener from the event.</p>
+<pre>thor::Connection connection = system.Connect(<span class="code-string">&quot;shoot&quot;</span>, &amp;OnShoot);
+connection.Disconnect();</pre>
+
+<p>A  connection automatically becomes invalid when the referenced listener is  disconnected, so you can&rsquo;t disconnect a listener accidentally more than once. To  disconnect all listeners associated with a given event type, call <code>thor::EventSystem::ClearConnections()</code>.</p>
+</div>
+<div id="footer">
+Copyright (c) Jan Haller 2011-2016
+</div>
+</body>
+</html>
